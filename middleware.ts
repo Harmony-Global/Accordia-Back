@@ -1,14 +1,23 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+function normalizeOrigin(origin: string) {
+  return origin.replace(/\/$/, "");
+}
+
+const configuredOrigins = (process.env.APP_FRONTEND_URL ?? "")
+  .split(",")
+  .map((origin) => normalizeOrigin(origin.trim()))
+  .filter(Boolean);
+
 const allowedOrigins = new Set([
   "http://localhost:3001",
   "http://127.0.0.1:3001",
-  process.env.APP_FRONTEND_URL ?? ""
+  ...configuredOrigins
 ]);
 
 function isAllowedOrigin(origin: string | null) {
   if (!origin) return false;
-  if (allowedOrigins.has(origin)) return true;
+  if (allowedOrigins.has(normalizeOrigin(origin))) return true;
   return /^http:\/\/localhost:\d+$/.test(origin) || /^http:\/\/127\.0\.0\.1:\d+$/.test(origin);
 }
 
