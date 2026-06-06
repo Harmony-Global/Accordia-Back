@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Accordia MVP Design Board</title>
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --surface: #ffffff;
+      --ink: #102a43;
+      --muted: #62748a;
+      --border: #d9e2ec;
+      --primary: #176b87;
+      --primary-soft: #e7f3f6;
+      --accent: #f5a524;
+      --success: #16a34a;
+      --danger: #dc2626;
+      --shadow: 0 18px 45px rgba(16, 42, 67, 0.10);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.45;
+    }
+    .board {
+      width: 1760px;
+      padding: 40px;
+      display: grid;
+      grid-template-columns: repeat(2, 820px);
+      gap: 32px;
+    }
+    .screen {
+      width: 820px;
+      min-height: 620px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .screen.wide { grid-column: span 2; width: 1672px; min-height: 680px; }
+    .top {
+      height: 64px;
+      padding: 0 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #fbfdff;
+    }
+    .brand { font-size: 20px; font-weight: 800; color: var(--primary); }
+    .nav { display: flex; gap: 10px; color: var(--muted); font-size: 13px; }
+    .nav span, .pill, .chip {
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 6px 10px;
+      background: #fff;
+      white-space: nowrap;
+    }
+    .pill.primary, .chip.active { color: var(--primary); border-color: #95cad6; background: var(--primary-soft); font-weight: 700; }
+    .pill.success { color: #0f7a34; border-color: #a7e3ba; background: #ecfdf3; }
+    .pill.warn { color: #a86100; border-color: #ffd99b; background: #fff7e6; }
+    .content { padding: 24px; }
+    h1, h2, h3, p { margin: 0; }
+    h1 { font-size: 34px; line-height: 1.05; letter-spacing: 0; }
+    h2 { font-size: 22px; }
+    h3 { font-size: 15px; }
+    p { color: var(--muted); font-size: 14px; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .layout { display: grid; grid-template-columns: 196px 1fr; min-height: 556px; }
+    .side {
+      border-right: 1px solid var(--border);
+      background: #fbfdff;
+      padding: 20px;
+    }
+    .side .item {
+      padding: 11px 12px;
+      margin-bottom: 6px;
+      border-radius: 8px;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 650;
+    }
+    .side .item.active { background: var(--primary-soft); color: var(--primary); }
+    .main { padding: 22px; }
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #fff;
+      padding: 16px;
+    }
+    .card.soft { background: #fbfdff; }
+    .metric strong { display: block; font-size: 26px; }
+    .metric span { color: var(--muted); font-size: 13px; }
+    .btn {
+      min-height: 44px;
+      border: 0;
+      border-radius: 8px;
+      background: var(--primary);
+      color: #fff;
+      padding: 0 16px;
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .btn.secondary { background: #fff; color: var(--primary); border: 1px solid #95cad6; }
+    .btn.accent { background: var(--accent); color: #1f2933; }
+    .field {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 11px 12px;
+      color: var(--muted);
+      background: #fff;
+      font-size: 14px;
+      min-height: 44px;
+    }
+    .password-field {
+      padding-right: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .icon-btn {
+      width: 32px;
+      height: 32px;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--muted);
+      display: grid;
+      place-items: center;
+    }
+    .icon-btn.active {
+      color: var(--primary);
+      background: var(--primary-soft);
+    }
+    .icon-btn svg { width: 18px; height: 18px; }
+    .oauth-divider {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 750;
+      text-transform: uppercase;
+    }
+    .oauth-divider::before,
+    .oauth-divider::after {
+      content: "";
+      height: 1px;
+      background: var(--border);
+    }
+    .btn.google {
+      background: #fff;
+      color: var(--ink);
+      border: 1px solid var(--border);
+      gap: 10px;
+    }
+    .google-mark { width: 18px; height: 18px; }
+    .stack { display: grid; gap: 14px; }
+    .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .list { display: grid; gap: 10px; }
+    .job, .applicant, .thread, .timeline {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      background: #fff;
+    }
+    .job .meta, .applicant .meta, .thread .meta { color: var(--muted); font-size: 12px; margin-top: 6px; }
+    .avatar {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: var(--primary-soft);
+      color: var(--primary);
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+    }
+    .auth-hero {
+      display: grid;
+      grid-template-columns: 1.05fr .95fr;
+      min-height: 556px;
+    }
+    .hero-left {
+      padding: 48px;
+      background: linear-gradient(135deg, #e7f3f6, #ffffff);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .role-card { min-height: 110px; display: grid; gap: 8px; }
+    .form { padding: 42px; display: grid; gap: 14px; align-content: center; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .split { display: grid; grid-template-columns: 1fr 320px; gap: 18px; }
+    .split.reverse { grid-template-columns: 300px 1fr; }
+    .status-line {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 8px;
+      margin: 18px 0;
+    }
+    .step {
+      border-top: 4px solid var(--border);
+      padding-top: 8px;
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+    .step.done { border-color: var(--success); color: var(--ink); }
+    .step.current { border-color: var(--accent); color: var(--ink); }
+    .table { display: grid; gap: 8px; }
+    .table-row {
+      display: grid;
+      grid-template-columns: 1.2fr .8fr .8fr .8fr .8fr;
+      gap: 10px;
+      align-items: center;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 13px;
+    }
+    .label { color: var(--muted); font-size: 12px; font-weight: 750; text-transform: uppercase; }
+  </style>
+</head>
+<body>
+  <main class="board">
+    <section class="screen">
+      <div class="top"><div class="brand">Accordia</div><div class="nav"><span>Login</span><span>Register</span></div></div>
+      <div class="auth-hero">
+        <div class="hero-left">
+          <div class="stack">
+            <h1>Find trusted work and trusted hands across Nigeria.</h1>
+            <p>Clients post clear jobs. Professionals see matched opportunities by category and apply with a structured pitch.</p>
+          </div>
+          <div class="grid2">
+            <div class="card role-card"><h3>I need a professional</h3><p>Post jobs, review applicants, award work, and track progress.</p><span class="pill primary">Client</span></div>
+            <div class="card role-card"><h3>I offer services</h3><p>Select categories, receive matched jobs, pitch, and update milestones.</p><span class="pill">Professional</span></div>
+          </div>
+        </div>
+        <div class="form">
+          <h2>Create account</h2>
+          <div class="grid2"><div class="field">First name</div><div class="field">Last name</div></div>
+          <div class="field">Email address</div>
+          <div class="field">Phone number</div>
+          <div class="field password-field">
+            <span>Password</span>
+            <button class="icon-btn" aria-label="Show password">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path>
+                <circle cx="12" cy="12" r="2.8"></circle>
+                <path d="M4 4l16 16"></path>
+              </svg>
+            </button>
+          </div>
+          <div class="chips"><span class="chip active">Client</span><span class="chip">Professional</span></div>
+          <button class="btn">Create account</button>
+          <div class="oauth-divider">or</div>
+          <button class="btn google">
+            <svg class="google-mark" viewBox="0 0 18 18" aria-hidden="true">
+              <path fill="#4285f4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.9c1.7-1.56 2.7-3.86 2.7-6.62Z"></path>
+              <path fill="#34a853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.84.86-3.06.86-2.35 0-4.34-1.58-5.05-3.72H.96v2.33A9 9 0 0 0 9 18Z"></path>
+              <path fill="#fbbc05" d="M3.95 10.7a5.4 5.4 0 0 1 0-3.4V4.97H.96a9 9 0 0 0 0 8.06l2.99-2.33Z"></path>
+              <path fill="#ea4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.9 11.42 0 9 0A9 9 0 0 0 .96 4.97L3.95 7.3C4.66 5.16 6.65 3.58 9 3.58Z"></path>
+            </svg>
+            Continue with Google
+          </button>
+          <button class="btn secondary">Sign in instead</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen">
+      <div class="layout">
+        <aside class="side"><div class="brand">Accordia</div><div class="item active">Dashboard</div><div class="item">Post job</div><div class="item">Applicants</div><div class="item">Messages</div><div class="item">Progress</div></aside>
+        <div class="main stack">
+          <div class="row"><div><h2>Client dashboard</h2><p>Welcome back, Amina. Your jobs and applicant activity.</p></div><button class="btn">Post job</button></div>
+          <div class="grid3">
+            <div class="card metric"><strong>4</strong><span>Open jobs</span></div>
+            <div class="card metric"><strong>18</strong><span>Applicants</span></div>
+            <div class="card metric"><strong>3</strong><span>In progress</span></div>
+          </div>
+          <div class="split">
+            <div class="stack">
+              <div class="row"><h3>Active jobs</h3><span class="pill primary">View all</span></div>
+              <div class="list">
+                <div class="job"><div class="row"><strong>Install kitchen cabinets</strong><span class="pill warn">Open</span></div><div class="meta">Carpentry • Lekki, Lagos • 46 views • 7 applicants</div></div>
+                <div class="job"><div class="row"><strong>Repair office inverter wiring</strong><span class="pill primary">Awarded</span></div><div class="meta">Electrical • Yaba, Lagos • 22 views • 4 applicants</div></div>
+                <div class="job"><div class="row"><strong>Deep clean 3-bedroom flat</strong><span class="pill success">In progress</span></div><div class="meta">Cleaning • Wuse 2, Abuja • 31 views • 5 applicants</div></div>
+              </div>
+            </div>
+            <div class="stack">
+              <div class="card soft"><h3>Trust status</h3><p>Phone verified. Business details pending admin review.</p><br><span class="pill success">Phone verified</span></div>
+              <div class="card soft"><h3>Recent message</h3><p>"I can start tomorrow after site inspection."</p></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen">
+      <div class="layout">
+        <aside class="side"><div class="brand">Accordia</div><div class="item">Dashboard</div><div class="item active">Post job</div><div class="item">Applicants</div><div class="item">Messages</div></aside>
+        <div class="main stack">
+          <div><h2>Post a job</h2><p>Clear job details help the right professionals decide quickly.</p></div>
+          <div class="split">
+            <div class="stack">
+              <div class="grid2"><div class="field">Job title</div><div class="field">Category</div></div>
+              <div class="field" style="height: 112px;">Description and expected outcome</div>
+              <div class="grid2"><div class="field">Budget min (NGN)</div><div class="field">Budget max (NGN)</div></div>
+              <div class="grid2"><div class="field">State</div><div class="field">Area / address hint</div></div>
+              <div class="grid2"><div class="field">Start date</div><div class="field">Deadline</div></div>
+              <button class="btn">Publish job</button>
+            </div>
+            <div class="card soft stack">
+              <span class="label">Preview</span>
+              <h3>Install kitchen cabinets</h3>
+              <p>Carpentry • Lekki, Lagos</p>
+              <p>Budget: ₦120k-₦180k fixed</p>
+              <span class="pill success">Client phone verified</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen">
+      <div class="layout">
+        <aside class="side"><div class="brand">Accordia</div><div class="item">Dashboard</div><div class="item active">Applicants</div><div class="item">Messages</div><div class="item">Progress</div></aside>
+        <div class="main stack">
+          <div><h2>Review applicants</h2><p>Install kitchen cabinets • 7 applicants</p></div>
+          <div class="split reverse">
+            <div class="list">
+              <div class="applicant"><div class="row"><strong>Tunde A.</strong><span class="pill success">Verified</span></div><div class="meta">₦150k • Can start Friday</div></div>
+              <div class="applicant"><div class="row"><strong>Grace U.</strong><span class="pill">Phone only</span></div><div class="meta">₦165k • 8 years experience</div></div>
+              <div class="applicant"><div class="row"><strong>Musa K.</strong><span class="pill">New</span></div><div class="meta">₦140k • Needs material list</div></div>
+            </div>
+            <div class="card stack">
+              <div class="row"><div class="avatar">TA</div><span class="pill success">Phone verified</span></div>
+              <h2>Tunde Akinola</h2>
+              <p>Carpenter in Lagos. 42 completed jobs outside Accordia, available this week.</p>
+              <div class="card soft"><h3>Pitch</h3><p>I can inspect measurements, source fittings, and complete installation within 3 days after material confirmation.</p></div>
+              <div class="grid3"><button class="btn secondary">Message</button><button class="btn secondary">Shortlist</button><button class="btn accent">Award job</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen">
+      <div class="layout">
+        <aside class="side"><div class="brand">Accordia</div><div class="item active">Onboarding</div><div class="item">Matched jobs</div><div class="item">Applications</div><div class="item">Messages</div></aside>
+        <div class="main stack">
+          <div><h2>Professional setup</h2><p>Select categories so Accordia can show only relevant jobs.</p></div>
+          <div class="grid2"><div class="field">Bio</div><div class="field">Location</div></div>
+          <div class="grid2"><div class="field">Years experience</div><div class="field">Typical rate</div></div>
+          <div class="card soft stack">
+            <div class="row"><h3>Service categories</h3><span class="pill primary">4 selected</span></div>
+            <div class="chips">
+              <span class="chip active">Plumbing</span><span class="chip active">Electrical</span><span class="chip">Cleaning</span><span class="chip">Carpentry</span><span class="chip">Painting</span><span class="chip active">Web Development</span><span class="chip active">Graphic Design</span><span class="chip">Photography</span><span class="chip">Catering</span><span class="chip">Tutoring</span>
+            </div>
+          </div>
+          <div class="card"><div class="row"><div><h3>Phone verification</h3><p>Receive matched jobs after phone verification.</p></div><button class="btn">Verify phone</button></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen">
+      <div class="layout">
+        <aside class="side"><div class="brand">Accordia</div><div class="item">Onboarding</div><div class="item active">Matched jobs</div><div class="item">Applications</div><div class="item">Messages</div></aside>
+        <div class="main stack">
+          <div class="row"><div><h2>Matched jobs</h2><p>Jobs matching your selected categories.</p></div><span class="pill success">Available</span></div>
+          <div class="chips"><span class="chip active">All matched</span><span class="chip">Lagos</span><span class="chip">Remote</span><span class="chip">₦100k+</span></div>
+          <div class="list">
+            <div class="job"><div class="row"><strong>Build a landing page for catering business</strong><button class="btn secondary">View</button></div><div class="meta">Web Development • Remote • ₦180k-₦250k • 9 applicants</div></div>
+            <div class="job"><div class="row"><strong>Design brand flyer pack for salon launch</strong><button class="btn secondary">View</button></div><div class="meta">Graphic Design • Ikeja, Lagos • ₦60k fixed • Client phone verified</div></div>
+            <div class="job"><div class="row"><strong>Repair office network points</strong><button class="btn secondary">View</button></div><div class="meta">Electrical • Victoria Island, Lagos • ₦90k-₦130k</div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen">
+      <div class="layout">
+        <aside class="side"><div class="brand">Accordia</div><div class="item">Matched jobs</div><div class="item active">Apply</div><div class="item">Messages</div></aside>
+        <div class="main stack">
+          <div><h2>Apply with pitch</h2><p>Build a landing page for catering business</p></div>
+          <div class="split reverse">
+            <div class="card soft stack"><span class="label">Job summary</span><h3>Remote • Web Development</h3><p>Client needs a responsive site for menu, booking inquiry, and photo gallery.</p><p>Budget: ₦180k-₦250k</p></div>
+            <div class="stack">
+              <div class="field" style="height: 156px;">Pitch: approach, relevant experience, and key questions</div>
+              <div class="grid2"><div class="field">Proposed rate</div><div class="field">Earliest start</div></div>
+              <div class="field">Optional note for client</div>
+              <button class="btn">Submit application</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen">
+      <div class="layout">
+        <aside class="side"><div class="brand">Accordia</div><div class="item">Jobs</div><div class="item active">Messages</div><div class="item">Progress</div></aside>
+        <div class="main stack">
+          <div><h2>Messages</h2><p>Async conversations grouped by job.</p></div>
+          <div class="split reverse">
+            <div class="list">
+              <div class="thread"><strong>Tunde A.</strong><div class="meta">Install kitchen cabinets • 12 min ago</div></div>
+              <div class="thread"><strong>Grace U.</strong><div class="meta">Install kitchen cabinets • Yesterday</div></div>
+              <div class="thread"><strong>Client: Bello Foods</strong><div class="meta">Landing page • Application sent</div></div>
+            </div>
+            <div class="card stack">
+              <div class="row"><div><h3>Install kitchen cabinets</h3><p>In discussion with Tunde A.</p></div><span class="pill primary">Application</span></div>
+              <div class="card soft"><p>I can inspect measurements tomorrow morning and send a final material list.</p></div>
+              <div class="card soft"><p>Good. Please include hinges and soft-close options in the estimate.</p></div>
+              <div class="field">Write message...</div>
+              <button class="btn">Send message</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen wide">
+      <div class="top"><div class="brand">Accordia</div><div class="nav"><span>Job progress</span><span>Messages</span><span>Details</span></div></div>
+      <div class="content stack">
+        <div class="row"><div><h2>Progress timeline</h2><p>Install kitchen cabinets • Awarded to Tunde Akinola</p></div><button class="btn">Add update</button></div>
+        <div class="status-line">
+          <div class="step done">Posted</div><div class="step done">Discussion</div><div class="step done">Awarded</div><div class="step current">In progress</div><div class="step">Review</div><div class="step">Delivered</div><div class="step">Closed</div>
+        </div>
+        <div class="grid2">
+          <div class="list">
+            <div class="timeline"><div class="row"><strong>Work started</strong><span class="pill success">In progress</span></div><p>Professional confirmed measurements and started cabinet installation.</p></div>
+            <div class="timeline"><div class="row"><strong>Job awarded</strong><span class="pill primary">Awarded</span></div><p>Client awarded work after agreeing terms directly with professional.</p></div>
+            <div class="timeline"><div class="row"><strong>Application reviewed</strong><span class="pill">Discussion</span></div><p>Client asked for material estimate and timeline.</p></div>
+          </div>
+          <div class="card soft stack">
+            <h3>Add participant update</h3>
+            <div class="field">Status</div>
+            <div class="field" style="height: 130px;">Progress note</div>
+            <button class="btn">Post update</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen wide">
+      <div class="top"><div class="brand">Accordia Admin</div><div class="nav"><span>Verification queue</span><span>Users</span><span>Jobs</span></div></div>
+      <div class="content stack">
+        <div><h2>Verification review queue</h2><p>Phone is the MVP trust baseline. Document review adds deeper trust where submitted.</p></div>
+        <div class="split">
+          <div class="table">
+            <div class="table-row label"><span>User</span><span>Role</span><span>Phone</span><span>Document</span><span>Status</span></div>
+            <div class="table-row"><strong>Amina Bello</strong><span>Client</span><span class="pill success">Verified</span><span>CAC docs</span><span class="pill warn">In review</span></div>
+            <div class="table-row"><strong>Tunde Akinola</strong><span>Professional</span><span class="pill success">Verified</span><span>NIN</span><span class="pill warn">In review</span></div>
+            <div class="table-row"><strong>Grace Udoh</strong><span>Professional</span><span class="pill">Pending</span><span>None</span><span class="pill">Pending</span></div>
+          </div>
+          <div class="card stack">
+            <span class="label">Selected review</span>
+            <h2>Tunde Akinola</h2>
+            <p>Professional • Carpentry, Painting • Lagos</p>
+            <div class="card soft"><p>Masked NIN: ***-***-4921</p><p>Submitted: Today</p><p>Risk notes: none</p></div>
+            <div class="grid2"><button class="btn secondary">Reject</button><button class="btn">Approve</button></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

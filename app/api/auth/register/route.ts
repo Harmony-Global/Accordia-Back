@@ -52,7 +52,10 @@ export async function POST(request: Request) {
     const { error } = await adminClient.from("professional_profiles").insert({
       user_id: authData.user.id
     });
-    if (error) return fail("Account created, but professional profile failed", 400, error.message);
+    if (error) {
+      await adminClient.auth.admin.deleteUser(authData.user.id);
+      return fail("Could not create professional profile", 400, error.message);
+    }
   }
 
   return created({

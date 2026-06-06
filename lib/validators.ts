@@ -5,7 +5,7 @@ export const profilePatchSchema = z.object({
   last_name: z.string().min(1).optional(),
   phone: z.string().min(7).optional(),
   avatar_url: z.string().url().nullable().optional()
-});
+}).strict();
 
 export const professionalProfilePatchSchema = z.object({
   bio: z.string().max(2000).nullable().optional(),
@@ -14,7 +14,7 @@ export const professionalProfilePatchSchema = z.object({
   location: z.string().nullable().optional(),
   state: z.string().nullable().optional(),
   is_available: z.boolean().optional()
-});
+}).strict();
 
 export const setCategoriesSchema = z.object({
   category_ids: z.array(z.string().uuid()).min(1)
@@ -36,16 +36,16 @@ export const createJobSchema = z.object({
 });
 
 export const updateJobSchema = createJobSchema.partial().extend({
-  status: z
-    .enum(["open", "in_discussion", "awarded", "in_progress", "in_review", "delivered", "closed", "cancelled"])
-    .optional(),
   payment_note: z.string().nullable().optional()
-});
+}).strict();
 
 export const applySchema = z.object({
   pitch: z.string().min(20).max(3000),
-  proposed_rate: z.number().min(0).nullable().optional()
+  proposed_rate: z.number().min(0).nullable().optional(),
+  reference_image_urls: z.array(z.string().max(1_500_000)).max(3).optional()
 });
+
+export const applicationPatchSchema = applySchema.partial().strict();
 
 export const awardSchema = z.object({
   agreed_amount: z.number().min(0).nullable().optional()
@@ -53,8 +53,14 @@ export const awardSchema = z.object({
 
 export const messageSchema = z.object({
   receiver_id: z.string().uuid(),
-  job_id: z.string().uuid().nullable().optional(),
+  job_id: z.string().uuid(),
+  application_id: z.string().uuid().nullable().optional(),
   body: z.string().min(1).max(3000)
+});
+
+export const markMessagesReadSchema = z.object({
+  job_id: z.string().uuid(),
+  sender_id: z.string().uuid().optional()
 });
 
 export const progressSchema = z.object({
@@ -64,4 +70,29 @@ export const progressSchema = z.object({
 
 export const verificationReviewSchema = z.object({
   status: z.enum(["verified", "rejected"])
+});
+
+export const phoneVerificationStartSchema = z.object({
+  phone: z.string().min(7).optional()
+});
+
+export const phoneVerificationConfirmSchema = z.object({
+  code: z.string().regex(/^\d{6}$/)
+});
+
+export const notificationReadSchema = z.object({
+  is_read: z.boolean().default(true)
+});
+
+export const adminUserStatusSchema = z.object({
+  is_active: z.boolean()
+});
+
+export const categoryWriteSchema = z.object({
+  name: z.string().min(2),
+  slug: z.string().min(2),
+  icon: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  is_active: z.boolean().default(true),
+  sort_order: z.number().int().default(0)
 });

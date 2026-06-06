@@ -4,6 +4,14 @@ import { progressSchema } from "@/lib/validators";
 
 type Params = { params: { jobId: string } };
 
+function progressErrorStatus(message?: string) {
+  if (!message) return 400;
+  if (message.includes("not found")) return 404;
+  if (message.includes("Only")) return 403;
+  if (message.includes("Invalid job status transition") || message.includes("already final")) return 409;
+  return 400;
+}
+
 export async function GET(request: Request, { params }: Params) {
   const auth = await requireUser(request);
   if (auth instanceof Response) return auth;
@@ -25,20 +33,15 @@ export async function POST(request: Request, { params }: Params) {
   const body = progressSchema.safeParse(await request.json());
   if (!body.success) return fail("Invalid progress payload", 422, body.error.flatten());
 
-  const { data, error } = await auth.userClient
-    .from("job_progress")
-    .insert({
-      job_id: params.jobId,
-      status: body.data.status,
-      note: body.data.note ?? null,
-      updated_by: auth.userId
-    })
-    .select("*")
-    .single();
+  const { data, error } = await auth.userClient.rpc("add_job_progress", {
+    p_job_id: params.jobId,
+    p_status: body.data.status,
+    p_note: body.data.note ?? null
+  });
 
-  if (error) return fail("Could not add progress", 400, error.message);
-
-  await auth.adminClient.from("jobs").update({ status: body.data.status }).eq("id", params.jobId);
+  if (error) {
+    return fail("Could not add progress", progressErrorStatus(error.message), error.message);
+  }
 
   return created({ progress: data });
 }

@@ -1,17 +1,23 @@
-import { created, fail, ok } from "@/lib/api";
+import { created, fail, ok, parseSearchParams } from "@/lib/api";
 import { requireUser } from "@/lib/auth";
 import { messageSchema } from "@/lib/validators";
 
 export async function GET(request: Request) {
   const auth = await requireUser(request);
   if (auth instanceof Response) return auth;
+  const params = parseSearchParams(request);
+  const jobId = params.get("job_id");
 
-  const { data, error } = await auth.userClient
+  let query = auth.userClient
     .from("messages")
-    .select("*, sender:profiles!messages_sender_id_fkey(id, first_name, last_name), receiver:profiles!messages_receiver_id_fkey(id, first_name, last_name)")
+    .select("*, sender:profiles!messages_sender_id_fkey(id, first_name, last_name), receiver:profiles!messages_receiver_id_fkey(id, first_name, last_name), job:jobs(id, title, status), application:applications(id, status)")
     .or(`sender_id.eq.${auth.userId},receiver_id.eq.${auth.userId}`)
     .order("created_at", { ascending: false })
     .limit(100);
+
+  if (jobId) query = query.eq("job_id", jobId);
+
+  const { data, error } = await query;
 
   if (error) return fail("Could not load messages", 400, error.message);
   return ok({ messages: data });
@@ -29,7 +35,8 @@ export async function POST(request: Request) {
     .insert({
       sender_id: auth.userId,
       receiver_id: body.data.receiver_id,
-      job_id: body.data.job_id ?? null,
+      job_id: body.data.job_id,
+      application_id: body.data.application_id ?? null,
       body: body.data.body
     })
     .select("*")

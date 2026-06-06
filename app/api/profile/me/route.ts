@@ -8,7 +8,7 @@ export async function GET(request: Request) {
 
   const { data: profile, error } = await auth.adminClient
     .from("profiles")
-    .select("*, professional_profiles(*)")
+    .select("*, professional_profiles(*, professional_categories(category:categories(*)))")
     .eq("id", auth.userId)
     .single();
 
@@ -28,7 +28,31 @@ export async function PATCH(request: Request) {
   if (!proPatch.success) return fail("Invalid professional profile payload", 422, proPatch.error.flatten());
 
   if (Object.keys(profilePatch.data).length > 0) {
-    const { error } = await auth.adminClient.from("profiles").update(profilePatch.data).eq("id", auth.userId);
+    const { data: currentProfile, error: loadError } = await auth.adminClient
+      .from("profiles")
+      .select("phone")
+      .eq("id", auth.userId)
+      .single();
+
+    if (loadError) return fail("Could not update profile", 400, loadError.message);
+
+    const update: Record<string, string | boolean | null> = {};
+    if (profilePatch.data.first_name !== undefined) update.first_name = profilePatch.data.first_name;
+    if (profilePatch.data.last_name !== undefined) update.last_name = profilePatch.data.last_name;
+    if (profilePatch.data.phone !== undefined) {
+      update.phone = profilePatch.data.phone;
+      if (profilePatch.data.phone !== currentProfile.phone) update.phone_verified = false;
+    }
+    if (Object.prototype.hasOwnProperty.call(profilePatch.data, "avatar_url")) {
+      update.avatar_url = profilePatch.data.avatar_url ?? null;
+    }
+
+    const { error } = await auth.adminClient
+      .from("profiles")
+      .update(update)
+      .eq("id", auth.userId)
+      .eq("is_active", true);
+
     if (error) return fail("Could not update profile", 400, error.message);
   }
 

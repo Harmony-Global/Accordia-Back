@@ -8,13 +8,15 @@ export async function GET(request: Request) {
 
   const params = parseSearchParams(request);
   const status = params.get("status");
+  const mine = params.get("mine") === "true";
 
   let query = auth.userClient
     .from("jobs")
-    .select("*, categories(*), client:profiles!jobs_client_id_fkey(id, first_name, last_name, phone_verified)")
+    .select("*, categories(*), client:profiles!jobs_client_id_fkey(id, first_name, last_name, phone_verified), applications(id, status)")
     .order("created_at", { ascending: false })
     .limit(50);
 
+  if (mine) query = query.eq("client_id", auth.userId);
   if (status) query = query.eq("status", status);
 
   const { data, error } = await query;

@@ -18,5 +18,15 @@ export async function POST(request: Request, { params }: Params) {
   });
 
   if (error) return fail("Could not apply to job", 400, error.message);
+  if (body.data.reference_image_urls?.length) {
+    const { error: referenceError } = await auth.adminClient
+      .from("applications")
+      .update({ reference_image_urls: body.data.reference_image_urls })
+      .eq("id", data)
+      .eq("professional_id", auth.userId);
+
+    if (referenceError) return fail("Application created, but references could not be saved", 400, referenceError.message);
+  }
+
   return created({ application_id: data });
 }

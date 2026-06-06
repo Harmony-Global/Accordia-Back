@@ -29,10 +29,11 @@ export async function PATCH(request: Request, { params }: Params) {
   const body = updateJobSchema.safeParse(await request.json());
   if (!body.success) return fail("Invalid job update payload", 422, body.error.flatten());
 
-  const { data, error } = await auth.userClient
+  const { data, error } = await auth.adminClient
     .from("jobs")
     .update(body.data)
     .eq("id", params.jobId)
+    .eq(auth.role === "admin" ? "id" : "client_id", auth.role === "admin" ? params.jobId : auth.userId)
     .select("*")
     .single();
 

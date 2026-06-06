@@ -26,6 +26,15 @@ export async function POST(request: Request) {
     .single();
 
   if (profileError) return fail("Profile not found", 403);
+  if (!profile.is_active) {
+    try {
+      const { error: signOutError } = await adminClient.auth.admin.signOut(data.session.access_token, "global");
+      if (signOutError) console.warn("Failed to revoke inactive user session", signOutError.message);
+    } catch (signOutError) {
+      console.warn("Failed to revoke inactive user session", signOutError);
+    }
+    return fail("Account is inactive", 403);
+  }
 
   return ok({ user: data.user, profile, session: data.session });
 }

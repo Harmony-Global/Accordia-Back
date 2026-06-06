@@ -2,6 +2,24 @@ import { fail, ok } from "@/lib/api";
 import { requireRole } from "@/lib/auth";
 import { setCategoriesSchema } from "@/lib/validators";
 
+export async function GET(request: Request) {
+  const auth = await requireRole(request, ["professional"]);
+  if (auth instanceof Response) return auth;
+
+  const { data: professionalProfile, error: profileError } = await auth.adminClient
+    .from("professional_profiles")
+    .select("id, professional_categories(category:categories(*))")
+    .eq("user_id", auth.userId)
+    .single();
+
+  if (profileError) return fail("Professional profile not found", 404, profileError.message);
+  const categories = (professionalProfile.professional_categories ?? []).map(
+    (row: { category: unknown }) => row.category
+  );
+
+  return ok({ categories });
+}
+
 export async function PUT(request: Request) {
   const auth = await requireRole(request, ["professional"]);
   if (auth instanceof Response) return auth;

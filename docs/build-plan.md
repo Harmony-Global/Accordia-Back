@@ -39,8 +39,9 @@ Supabase:
 
 - Create Supabase project.
 - Run `supabase/migrations/0001_init_accordia.sql`.
+- Run `supabase/migrations/0002_security_workflow_otp.sql`.
 - Run `supabase/seed.sql`.
-- Add local `.env.local` from `.env.example`.
+- Add local `.env` from `.env.example`.
 - Deploy to Netlify and add the same env vars there.
 
 ### Phase 2: Auth and Onboarding
@@ -76,14 +77,42 @@ Supabase:
 
 1. Create a Supabase project.
 2. Copy the project URL, anon key, and service role key.
-3. Create `.env.local` using `.env.example`.
+3. Create `.env` using `.env.example`.
 4. Run the SQL migration in Supabase SQL editor.
-5. Run the seed SQL in Supabase SQL editor.
-6. Install dependencies with `npm install`.
-7. Run locally with `npm run dev`.
-8. Connect the Git repo to Netlify.
-9. Add env vars in Netlify project settings.
-10. Deploy.
+5. Run the security/workflow migration in Supabase SQL editor.
+6. Run the seed SQL in Supabase SQL editor.
+7. Install dependencies with `npm install`.
+8. Run locally with `npm run dev`.
+9. Connect the Git repo to Netlify.
+10. Add env vars in Netlify project settings.
+11. Deploy.
+
+## Admin Bootstrap
+
+Create the first admin after registering a normal account:
+
+```sql
+update public.profiles
+set role = 'admin'
+where email = 'admin@example.com';
+```
+
+Run this directly in the Supabase SQL editor. After the first admin exists, admin API routes can manage verification queues, users, and categories.
+
+## Manual Backend Verification
+
+Until a test framework is added, verify these flows after applying migrations:
+
+1. Register client and professional users.
+2. Confirm inactive profiles cannot log in or access protected routes.
+3. Confirm direct profile updates cannot change `role`, `phone_verified`, or `is_active`.
+4. Start and confirm phone verification; confirm wrong and expired OTPs fail.
+5. Change phone through `PATCH /api/profile/me`; confirm `phone_verified` resets.
+6. Set professional categories and confirm only open matching jobs appear in `/api/jobs/feed`.
+7. Apply to a job, award one application, and confirm competing applications become rejected.
+8. Confirm invalid progress transitions are rejected.
+9. Confirm only valid job participants can send messages for a job.
+10. Confirm notification read updates cannot change notification content.
 
 ## First Product Decisions Already Locked
 

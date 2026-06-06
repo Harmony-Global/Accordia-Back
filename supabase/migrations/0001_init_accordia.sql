@@ -541,3 +541,25 @@ on public.notifications for update
 to authenticated
 using (user_id = auth.uid() or public.is_admin())
 with check (user_id = auth.uid() or public.is_admin());
+
+grant usage on schema public to anon, authenticated, service_role;
+
+grant select, insert, update, delete on all tables in schema public to service_role;
+grant select on public.categories to authenticated;
+grant select, insert, update on public.profiles to authenticated;
+grant select, insert, update on public.professional_profiles to authenticated;
+grant select, insert, update, delete on public.professional_categories to authenticated;
+grant select, insert, update on public.jobs to authenticated;
+grant select, insert on public.job_views to authenticated;
+grant select, insert, update on public.applications to authenticated;
+grant select, insert, update on public.messages to authenticated;
+grant select, insert on public.job_progress to authenticated;
+grant select, insert, update on public.verifications to authenticated;
+grant select, update on public.notifications to authenticated;
+
+grant execute on function public.is_admin() to authenticated, service_role;
+grant execute on function public.user_role() to authenticated, service_role;
+grant execute on function public.professional_can_see_job(uuid) to authenticated, service_role;
+grant execute on function public.record_job_view(uuid) to authenticated, service_role;
+grant execute on function public.apply_to_job(uuid, text, numeric) to authenticated, service_role;
+grant execute on function public.award_application(uuid, numeric) to authenticated, service_role;
