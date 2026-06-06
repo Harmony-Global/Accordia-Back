@@ -13,7 +13,7 @@ function isAllowedOrigin(origin: string | null) {
 }
 
 function applyCorsHeaders(response: NextResponse, origin: string | null) {
-  if (isAllowedOrigin(origin)) {
+  if (origin && isAllowedOrigin(origin)) {
     response.headers.set("Access-Control-Allow-Origin", origin);
     response.headers.set("Vary", "Origin");
   }

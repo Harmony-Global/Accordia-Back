@@ -1,0 +1,8 @@
+ ⚠ Port 3000 is in use, trying 3001 instead.
+ ⚠ Port 3001 is in use, trying 3002 instead.
+[Error: EPERM: operation not permitted, open 'C:\Users\DELL\Accordia-Back\.next\trace'] {
+  errno: -4048,
+  code: 'EPERM',
+  syscall: 'open',
+  path: 'C:\\Users\\DELL\\Accordia-Back\\.next\\trace'
+}
