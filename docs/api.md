@@ -24,7 +24,8 @@ Errors use:
 ## Profile and Onboarding
 
 - `GET /api/profile/me`
-  - Returns the current profile, professional profile, and selected professional categories.
+  - Returns the current profile, professional profile, selected professional categories, and professional services/products.
+  - Professional responses include `professional_services_progress` for the five-active-offering onboarding target.
 - `PATCH /api/profile/me`
   - Body: `{ "profile": { "first_name"?, "last_name"?, "phone"?, "avatar_url"? }, "professional_profile": { ... } }`
   - Phone changes reset `phone_verified`.
@@ -35,6 +36,21 @@ Errors use:
 - `PUT /api/professional/categories`
   - Body: `{ "category_ids": ["uuid"] }`
   - Replaces selected categories.
+- `GET /api/professional/services`
+  - Professional: returns the caller's services/products, including inactive entries.
+  - Client/admin: pass `professional_id=<profile-uuid>` to view a professional's active entries.
+  - Returns `service_count`, `minimum_required: 5`, and `has_minimum_services`.
+- `POST /api/professional/services`
+  - Professional only.
+  - Body: `{ "category_id"?, "offering_type": "service" | "product", "title", "description", "image_url", "price_min", "price_max", "currency"?, "is_active"? }`
+  - A supplied category must already be selected on the professional's profile.
+- `POST /api/professional/services/upload`
+  - Professional only. Multipart form body with a `file` field.
+  - Accepts JPEG, PNG, or WebP images up to 5 MB and returns the public `image_url`.
+- `PATCH /api/professional/services/:serviceId`
+  - Professional only. Updates an owned service/product.
+- `DELETE /api/professional/services/:serviceId`
+  - Professional only. Deletes an owned service/product.
 
 ## Phone Verification
 
@@ -54,7 +70,10 @@ Errors use:
   - Query: `status?`, `mine=true?`
   - Returns RLS-visible jobs. `mine=true` filters to the caller's client jobs.
 - `POST /api/jobs`
-  - Client only. Creates a job and initial progress entry.
+  - Client only.
+  - Body: `{ "category_id", "title", "description", "location"?, "state"?, "is_remote"?, "start_date"?, "end_date"? }`
+  - Client job payloads do not include budget or price-range fields.
+  - Creates a job and initial progress entry.
 - `GET /api/jobs/feed`
   - Professional only. Returns open jobs matching selected categories while the professional is available.
 - `GET /api/jobs/:jobId`
@@ -63,8 +82,9 @@ Errors use:
   - Client/admin only. Updates editable job fields, not workflow status.
 - `POST /api/jobs/:jobId/apply`
   - Professional only. Creates an application, first message, notification, and discussion progress entry.
+  - The job remains open for other offers until the client awards an application.
 - `GET /api/jobs/:jobId/applications`
-  - Client/admin only. Lists applicants for the job.
+  - Client/admin only. Lists applicants with their profile, categories, and services/products.
 
 ## Applications
 
@@ -72,6 +92,8 @@ Errors use:
   - Professional only. Lists the caller's applications with job context.
 - `POST /api/applications/:applicationId/award`
   - Client only. Awards a pending/reviewed/shortlisted application when the job is still awardable.
+  - Marks competing applications as rejected and creates an in-app notification for each unsuccessful professional.
+  - The awarded job is removed from professional feeds and cannot receive new applications.
 
 ## Messages
 

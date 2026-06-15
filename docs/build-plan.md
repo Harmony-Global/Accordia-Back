@@ -23,6 +23,7 @@ Supabase:
 
 - Auth users
 - Profiles and professional profiles
+- Professional services and products with profile images and price ranges
 - Categories
 - Jobs
 - Job views
@@ -31,7 +32,7 @@ Supabase:
 - Job progress timeline
 - Phone verification records
 - Notification records
-- Storage buckets later for avatars and job attachments
+- Storage for professional offering images; avatar and job attachment buckets can follow the same pattern.
 
 ## Backend Phases
 
@@ -51,10 +52,12 @@ Supabase:
 - Use `GET /api/profile/me`.
 - Use `PATCH /api/profile/me`.
 - For professionals, save categories with `PUT /api/professional/categories`.
+- Professionals add at least five active services/products through `/api/professional/services` to complete their offering portfolio.
 
 ### Phase 3: Job Marketplace
 
 - Clients create jobs with `POST /api/jobs`.
+- Client job posts describe the work without publishing a budget range.
 - Professionals load matched jobs with `GET /api/jobs/feed`.
 - Professionals view job details with `GET /api/jobs/:jobId`, which records one view per professional.
 - Professionals apply with `POST /api/jobs/:jobId/apply`.
@@ -109,10 +112,11 @@ Until a test framework is added, verify these flows after applying migrations:
 4. Start and confirm phone verification; confirm wrong and expired OTPs fail.
 5. Change phone through `PATCH /api/profile/me`; confirm `phone_verified` resets.
 6. Set professional categories and confirm only open matching jobs appear in `/api/jobs/feed`.
-7. Apply to a job, award one application, and confirm competing applications become rejected.
-8. Confirm invalid progress transitions are rejected.
-9. Confirm only valid job participants can send messages for a job.
-10. Confirm notification read updates cannot change notification content.
+7. Submit multiple applications to one open job, award one application, and confirm competing applications become rejected and receive notifications.
+8. Confirm an awarded job disappears from professional feeds and rejects new applications.
+9. Confirm invalid progress transitions are rejected.
+10. Confirm only valid job participants can send messages for a job.
+11. Confirm notification read updates cannot change notification content.
 
 ## First Product Decisions Already Locked
 

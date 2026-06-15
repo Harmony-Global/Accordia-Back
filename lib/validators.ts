@@ -10,11 +10,37 @@ export const profilePatchSchema = z.object({
 export const professionalProfilePatchSchema = z.object({
   bio: z.string().max(2000).nullable().optional(),
   years_experience: z.number().int().min(0).optional(),
-  hourly_rate: z.number().min(0).nullable().optional(),
   location: z.string().nullable().optional(),
   state: z.string().nullable().optional(),
   is_available: z.boolean().optional()
 }).strict();
+
+const professionalServiceSchema = z.object({
+  category_id: z.string().uuid().nullable().optional(),
+  offering_type: z.enum(["service", "product"]).default("service"),
+  title: z.string().min(3).max(160),
+  description: z.string().min(10).max(3000),
+  image_url: z.string().url().max(2048),
+  price_min: z.number().min(0),
+  price_max: z.number().min(0),
+  currency: z.string().trim().min(3).max(3).transform((value) => value.toUpperCase()).default("NGN"),
+  is_active: z.boolean().default(true)
+}).strict();
+
+export const professionalServiceCreateSchema = professionalServiceSchema.refine((data) => data.price_max >= data.price_min, {
+  message: "Maximum price must be greater than or equal to minimum price",
+  path: ["price_max"]
+});
+
+export const professionalServicePatchSchema = professionalServiceSchema
+  .omit({ offering_type: true, currency: true, is_active: true })
+  .partial()
+  .extend({
+    offering_type: z.enum(["service", "product"]).optional(),
+    currency: z.string().trim().min(3).max(3).transform((value) => value.toUpperCase()).optional(),
+    is_active: z.boolean().optional()
+  })
+  .strict();
 
 export const setCategoriesSchema = z.object({
   category_ids: z.array(z.string().uuid()).min(1)
@@ -24,20 +50,14 @@ export const createJobSchema = z.object({
   category_id: z.string().uuid(),
   title: z.string().min(5).max(180),
   description: z.string().min(20),
-  budget_min: z.number().min(0).nullable().optional(),
-  budget_max: z.number().min(0).nullable().optional(),
-  budget_type: z.enum(["fixed", "hourly"]).default("fixed"),
-  currency: z.string().default("NGN"),
   location: z.string().nullable().optional(),
   state: z.string().nullable().optional(),
   is_remote: z.boolean().default(false),
   start_date: z.string().nullable().optional(),
   end_date: z.string().nullable().optional()
-});
-
-export const updateJobSchema = createJobSchema.partial().extend({
-  payment_note: z.string().nullable().optional()
 }).strict();
+
+export const updateJobSchema = createJobSchema.partial().strict();
 
 export const applySchema = z.object({
   pitch: z.string().min(20).max(3000),

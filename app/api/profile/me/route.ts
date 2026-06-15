@@ -8,12 +8,29 @@ export async function GET(request: Request) {
 
   const { data: profile, error } = await auth.adminClient
     .from("profiles")
-    .select("*, professional_profiles(*, professional_categories(category:categories(*)))")
+    .select("*, professional_profiles(*, professional_categories(category:categories(*)), professional_services(*, category:categories(*)))")
     .eq("id", auth.userId)
     .single();
 
   if (error) return fail("Could not load profile", 400, error.message);
-  return ok({ profile });
+
+  const professionalProfile = Array.isArray(profile.professional_profiles)
+    ? profile.professional_profiles[0]
+    : profile.professional_profiles;
+  const activeServiceCount = professionalProfile?.professional_services?.filter(
+    (service: { is_active: boolean }) => service.is_active
+  ).length ?? 0;
+
+  return ok({
+    profile,
+    professional_services_progress: auth.role === "professional"
+      ? {
+          service_count: activeServiceCount,
+          minimum_required: 5,
+          has_minimum_services: activeServiceCount >= 5
+        }
+      : null
+  });
 }
 
 export async function PATCH(request: Request) {

@@ -18,7 +18,7 @@ export async function GET(request: Request, { params }: Params) {
 
   const { data, error } = await auth.adminClient
     .from("applications")
-    .select("*, professional:profiles!applications_professional_id_fkey(id, first_name, last_name, phone_verified, avatar_url)")
+    .select("*, professional:profiles!applications_professional_id_fkey(id, first_name, last_name, phone_verified, avatar_url, professional_profiles(*, professional_categories(category:categories(*)), professional_services(*, category:categories(*))))")
     .eq("job_id", params.jobId)
     .order("created_at", { ascending: false });
 
