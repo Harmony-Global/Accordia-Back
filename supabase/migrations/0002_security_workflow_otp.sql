@@ -293,6 +293,7 @@ using (public.is_admin())
 with check (public.is_admin());
 
 drop policy if exists "participants can send messages" on public.messages;
+drop policy if exists "participants can send job messages" on public.messages;
 create policy "participants can send job messages"
 on public.messages for insert
 to authenticated
@@ -310,6 +311,7 @@ using (receiver_id = auth.uid() or public.is_admin())
 with check (receiver_id = auth.uid() or public.is_admin());
 
 drop policy if exists "progress visible to job participants" on public.job_progress;
+drop policy if exists "progress visible to actual job participants" on public.job_progress;
 create policy "progress visible to actual job participants"
 on public.job_progress for select
 to authenticated
@@ -330,6 +332,7 @@ using (
 );
 
 drop policy if exists "users update own notifications" on public.notifications;
+drop policy if exists "users mark own notifications read" on public.notifications;
 create policy "users mark own notifications read"
 on public.notifications for update
 to authenticated

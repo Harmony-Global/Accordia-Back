@@ -1,6 +1,6 @@
 create extension if not exists pgcrypto;
 
-create table public.profiles (
+create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   email text not null,
   phone text unique not null,
@@ -14,7 +14,7 @@ create table public.profiles (
   updated_at timestamptz not null default now()
 );
 
-create table public.professional_profiles (
+create table if not exists public.professional_profiles (
   id uuid primary key default gen_random_uuid(),
   user_id uuid unique not null references public.profiles(id) on delete cascade,
   bio text,
@@ -28,7 +28,7 @@ create table public.professional_profiles (
   updated_at timestamptz not null default now()
 );
 
-create table public.categories (
+create table if not exists public.categories (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   slug text unique not null,
@@ -39,13 +39,13 @@ create table public.categories (
   created_at timestamptz not null default now()
 );
 
-create table public.professional_categories (
+create table if not exists public.professional_categories (
   professional_id uuid not null references public.professional_profiles(id) on delete cascade,
   category_id uuid not null references public.categories(id) on delete cascade,
   primary key (professional_id, category_id)
 );
 
-create table public.jobs (
+create table if not exists public.jobs (
   id uuid primary key default gen_random_uuid(),
   client_id uuid not null references public.profiles(id) on delete cascade,
   category_id uuid not null references public.categories(id),
@@ -73,7 +73,7 @@ create table public.jobs (
   constraint budget_range_valid check (budget_max is null or budget_min is null or budget_max >= budget_min)
 );
 
-create table public.job_views (
+create table if not exists public.job_views (
   id uuid primary key default gen_random_uuid(),
   job_id uuid not null references public.jobs(id) on delete cascade,
   professional_id uuid not null references public.profiles(id) on delete cascade,
@@ -81,7 +81,7 @@ create table public.job_views (
   unique (job_id, professional_id)
 );
 
-create table public.applications (
+create table if not exists public.applications (
   id uuid primary key default gen_random_uuid(),
   job_id uuid not null references public.jobs(id) on delete cascade,
   professional_id uuid not null references public.profiles(id) on delete cascade,
@@ -93,7 +93,7 @@ create table public.applications (
   unique (job_id, professional_id)
 );
 
-create table public.messages (
+create table if not exists public.messages (
   id uuid primary key default gen_random_uuid(),
   sender_id uuid not null references public.profiles(id) on delete cascade,
   receiver_id uuid not null references public.profiles(id) on delete cascade,
@@ -104,7 +104,7 @@ create table public.messages (
   created_at timestamptz not null default now()
 );
 
-create table public.job_progress (
+create table if not exists public.job_progress (
   id uuid primary key default gen_random_uuid(),
   job_id uuid not null references public.jobs(id) on delete cascade,
   status text not null check (
@@ -115,7 +115,7 @@ create table public.job_progress (
   created_at timestamptz not null default now()
 );
 
-create table public.verifications (
+create table if not exists public.verifications (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.profiles(id) on delete cascade,
   type text not null default 'phone' check (type in ('phone')),
@@ -127,7 +127,7 @@ create table public.verifications (
   unique (user_id, type)
 );
 
-create table public.notifications (
+create table if not exists public.notifications (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.profiles(id) on delete cascade,
   type text not null,
@@ -140,24 +140,24 @@ create table public.notifications (
   created_at timestamptz not null default now()
 );
 
-create index profiles_role_idx on public.profiles(role);
-create index professional_profiles_user_idx on public.professional_profiles(user_id);
-create index professional_profiles_state_idx on public.professional_profiles(state);
-create index categories_active_sort_idx on public.categories(is_active, sort_order);
-create index professional_categories_category_idx on public.professional_categories(category_id);
-create index jobs_client_idx on public.jobs(client_id);
-create index jobs_category_idx on public.jobs(category_id);
-create index jobs_status_idx on public.jobs(status);
-create index jobs_state_idx on public.jobs(state);
-create index jobs_created_idx on public.jobs(created_at desc);
-create index job_views_job_idx on public.job_views(job_id);
-create index applications_job_idx on public.applications(job_id);
-create index applications_pro_idx on public.applications(professional_id);
-create index messages_participants_idx on public.messages(sender_id, receiver_id, created_at desc);
-create index messages_receiver_unread_idx on public.messages(receiver_id, is_read);
-create index job_progress_job_idx on public.job_progress(job_id, created_at desc);
-create index verifications_status_idx on public.verifications(status);
-create index notifications_user_idx on public.notifications(user_id, is_read, created_at desc);
+create index if not exists profiles_role_idx on public.profiles(role);
+create index if not exists professional_profiles_user_idx on public.professional_profiles(user_id);
+create index if not exists professional_profiles_state_idx on public.professional_profiles(state);
+create index if not exists categories_active_sort_idx on public.categories(is_active, sort_order);
+create index if not exists professional_categories_category_idx on public.professional_categories(category_id);
+create index if not exists jobs_client_idx on public.jobs(client_id);
+create index if not exists jobs_category_idx on public.jobs(category_id);
+create index if not exists jobs_status_idx on public.jobs(status);
+create index if not exists jobs_state_idx on public.jobs(state);
+create index if not exists jobs_created_idx on public.jobs(created_at desc);
+create index if not exists job_views_job_idx on public.job_views(job_id);
+create index if not exists applications_job_idx on public.applications(job_id);
+create index if not exists applications_pro_idx on public.applications(professional_id);
+create index if not exists messages_participants_idx on public.messages(sender_id, receiver_id, created_at desc);
+create index if not exists messages_receiver_unread_idx on public.messages(receiver_id, is_read);
+create index if not exists job_progress_job_idx on public.job_progress(job_id, created_at desc);
+create index if not exists verifications_status_idx on public.verifications(status);
+create index if not exists notifications_user_idx on public.notifications(user_id, is_read, created_at desc);
 
 create or replace function public.touch_updated_at()
 returns trigger
@@ -169,18 +169,22 @@ begin
 end;
 $$;
 
+drop trigger if exists profiles_touch_updated_at on public.profiles;
 create trigger profiles_touch_updated_at
 before update on public.profiles
 for each row execute function public.touch_updated_at();
 
+drop trigger if exists professional_profiles_touch_updated_at on public.professional_profiles;
 create trigger professional_profiles_touch_updated_at
 before update on public.professional_profiles
 for each row execute function public.touch_updated_at();
 
+drop trigger if exists jobs_touch_updated_at on public.jobs;
 create trigger jobs_touch_updated_at
 before update on public.jobs
 for each row execute function public.touch_updated_at();
 
+drop trigger if exists applications_touch_updated_at on public.applications;
 create trigger applications_touch_updated_at
 before update on public.applications
 for each row execute function public.touch_updated_at();
@@ -372,44 +376,52 @@ alter table public.job_progress enable row level security;
 alter table public.verifications enable row level security;
 alter table public.notifications enable row level security;
 
+drop policy if exists "profiles are readable to authenticated users" on public.profiles;
 create policy "profiles are readable to authenticated users"
 on public.profiles for select
 to authenticated
 using (is_active = true);
 
+drop policy if exists "users can insert own profile" on public.profiles;
 create policy "users can insert own profile"
 on public.profiles for insert
 to authenticated
 with check (id = auth.uid());
 
+drop policy if exists "users can update own profile" on public.profiles;
 create policy "users can update own profile"
 on public.profiles for update
 to authenticated
 using (id = auth.uid() or public.is_admin())
 with check (id = auth.uid() or public.is_admin());
 
+drop policy if exists "professional profile visible to authenticated users" on public.professional_profiles;
 create policy "professional profile visible to authenticated users"
 on public.professional_profiles for select
 to authenticated
 using (true);
 
+drop policy if exists "professionals manage own profile" on public.professional_profiles;
 create policy "professionals manage own profile"
 on public.professional_profiles for all
 to authenticated
 using (user_id = auth.uid() or public.is_admin())
 with check (user_id = auth.uid() or public.is_admin());
 
+drop policy if exists "categories are public to authenticated users" on public.categories;
 create policy "categories are public to authenticated users"
 on public.categories for select
 to authenticated
 using (is_active = true);
 
+drop policy if exists "admins manage categories" on public.categories;
 create policy "admins manage categories"
 on public.categories for all
 to authenticated
 using (public.is_admin())
 with check (public.is_admin());
 
+drop policy if exists "professionals manage own categories" on public.professional_categories;
 create policy "professionals manage own categories"
 on public.professional_categories for all
 to authenticated
@@ -426,6 +438,7 @@ with check (
   ) or public.is_admin()
 );
 
+drop policy if exists "professionals read own category links" on public.professional_categories;
 create policy "professionals read own category links"
 on public.professional_categories for select
 to authenticated
@@ -436,6 +449,7 @@ using (
   ) or public.is_admin()
 );
 
+drop policy if exists "clients read own jobs and pros read matching jobs" on public.jobs;
 create policy "clients read own jobs and pros read matching jobs"
 on public.jobs for select
 to authenticated
@@ -446,17 +460,20 @@ using (
   or (status in ('open', 'in_discussion') and public.professional_can_see_job(category_id))
 );
 
+drop policy if exists "clients create jobs" on public.jobs;
 create policy "clients create jobs"
 on public.jobs for insert
 to authenticated
 with check (client_id = auth.uid() and public.user_role() = 'client');
 
+drop policy if exists "clients and admins update jobs" on public.jobs;
 create policy "clients and admins update jobs"
 on public.jobs for update
 to authenticated
 using (client_id = auth.uid() or public.is_admin())
 with check (client_id = auth.uid() or public.is_admin());
 
+drop policy if exists "job views readable by job client or viewing pro" on public.job_views;
 create policy "job views readable by job client or viewing pro"
 on public.job_views for select
 to authenticated
@@ -466,6 +483,7 @@ using (
   or exists (select 1 from public.jobs j where j.id = job_id and j.client_id = auth.uid())
 );
 
+drop policy if exists "applications visible to job client or applicant" on public.applications;
 create policy "applications visible to job client or applicant"
 on public.applications for select
 to authenticated
@@ -475,22 +493,26 @@ using (
   or exists (select 1 from public.jobs j where j.id = job_id and j.client_id = auth.uid())
 );
 
+drop policy if exists "messages visible to participants" on public.messages;
 create policy "messages visible to participants"
 on public.messages for select
 to authenticated
 using (sender_id = auth.uid() or receiver_id = auth.uid() or public.is_admin());
 
+drop policy if exists "participants can send messages" on public.messages;
 create policy "participants can send messages"
 on public.messages for insert
 to authenticated
 with check (sender_id = auth.uid());
 
+drop policy if exists "receiver can mark messages read" on public.messages;
 create policy "receiver can mark messages read"
 on public.messages for update
 to authenticated
 using (receiver_id = auth.uid() or public.is_admin())
 with check (receiver_id = auth.uid() or public.is_admin());
 
+drop policy if exists "progress visible to job participants" on public.job_progress;
 create policy "progress visible to job participants"
 on public.job_progress for select
 to authenticated
@@ -503,6 +525,7 @@ using (
   )
 );
 
+drop policy if exists "progress insert by job participants" on public.job_progress;
 create policy "progress insert by job participants"
 on public.job_progress for insert
 to authenticated
@@ -515,27 +538,32 @@ with check (
   )
 );
 
+drop policy if exists "users read own verification" on public.verifications;
 create policy "users read own verification"
 on public.verifications for select
 to authenticated
 using (user_id = auth.uid() or public.is_admin());
 
+drop policy if exists "users create own phone verification" on public.verifications;
 create policy "users create own phone verification"
 on public.verifications for insert
 to authenticated
 with check (user_id = auth.uid() and type = 'phone');
 
+drop policy if exists "admins update verification" on public.verifications;
 create policy "admins update verification"
 on public.verifications for update
 to authenticated
 using (public.is_admin())
 with check (public.is_admin());
 
+drop policy if exists "users read own notifications" on public.notifications;
 create policy "users read own notifications"
 on public.notifications for select
 to authenticated
 using (user_id = auth.uid() or public.is_admin());
 
+drop policy if exists "users update own notifications" on public.notifications;
 create policy "users update own notifications"
 on public.notifications for update
 to authenticated
