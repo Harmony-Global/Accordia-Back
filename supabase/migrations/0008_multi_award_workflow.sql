@@ -433,6 +433,36 @@ as $$
   );
 $$;
 
+create or replace function public.has_job_application(p_job_id uuid, p_user_id uuid default auth.uid())
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.applications a
+    where a.job_id = p_job_id
+      and a.professional_id = p_user_id
+  );
+$$;
+
+create or replace function public.has_job_award(p_job_id uuid, p_user_id uuid default auth.uid())
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.job_awards ja
+    where ja.job_id = p_job_id
+      and ja.professional_id = p_user_id
+  );
+$$;
+
 create or replace function public.add_job_progress(
   p_job_id uuid,
   p_status text,
@@ -508,14 +538,8 @@ using (
   client_id = auth.uid()
   or awarded_to = auth.uid()
   or public.is_admin()
-  or exists (
-    select 1 from public.job_awards ja
-    where ja.job_id = id and ja.professional_id = auth.uid()
-  )
-  or exists (
-    select 1 from public.applications a
-    where a.job_id = id and a.professional_id = auth.uid()
-  )
+  or public.has_job_award(id, auth.uid())
+  or public.has_job_application(id, auth.uid())
   or (status = 'open' and public.professional_can_see_job(category_id))
 );
 
@@ -532,14 +556,8 @@ using (
       and (
         j.client_id = auth.uid()
         or j.awarded_to = auth.uid()
-        or exists (
-          select 1 from public.job_awards ja
-          where ja.job_id = j.id and ja.professional_id = auth.uid()
-        )
-        or exists (
-          select 1 from public.applications a
-          where a.job_id = j.id and a.professional_id = auth.uid()
-        )
+        or public.has_job_award(j.id, auth.uid())
+        or public.has_job_application(j.id, auth.uid())
         or (
           j.status = 'open'
           and public.professional_can_see_job(j.category_id)
@@ -553,4 +571,6 @@ grant execute on function public.undo_award_application(uuid) to authenticated, 
 grant execute on function public.seal_job_awards(uuid) to authenticated, service_role;
 grant execute on function public.is_job_participant(uuid, uuid) to authenticated, service_role;
 grant execute on function public.can_message_for_job(uuid, uuid, uuid) to authenticated, service_role;
+grant execute on function public.has_job_application(uuid, uuid) to authenticated, service_role;
+grant execute on function public.has_job_award(uuid, uuid) to authenticated, service_role;
 grant execute on function public.add_job_progress(uuid, text, text) to authenticated, service_role;
