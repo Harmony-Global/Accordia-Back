@@ -105,9 +105,15 @@ Errors use:
 - `GET /api/applications/me`
   - Professional only. Lists the caller's applications with job context.
 - `POST /api/applications/:applicationId/award`
-  - Client only. Awards a pending/reviewed/shortlisted application when the job is still awardable.
-  - Marks competing applications as rejected and creates an in-app notification for each unsuccessful professional.
-  - The awarded job is removed from professional feeds and cannot receive new applications.
+  - Client only. Marks a pending/reviewed/shortlisted application as `selected`.
+  - Returns `{ "application": { ... } }`.
+- `POST /api/applications/:applicationId/undo-award`
+  - Client only. Restores a `selected` application to its previous reviewable status before awards are sealed.
+  - Returns `{ "application": { ... } }`.
+- `POST /api/jobs/:jobId/awards/seal`
+  - Client only. Finalizes all selected applications for the job.
+  - Selected applications become `awarded`; remaining reviewable applications become `not_awarded`.
+  - Creates award/not-awarded notifications, writes audit logs, removes the job from professional feeds, and blocks new applications.
 
 ## Messages
 

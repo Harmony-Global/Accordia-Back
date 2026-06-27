@@ -2,6 +2,7 @@ import { created, fail } from "@/lib/api";
 import { recordPasswordLog } from "@/lib/password-log";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { createSupabasePublic } from "@/lib/supabase/public";
+import { sendWelcomeMessage } from "@/lib/welcome";
 import { z } from "zod";
 
 const registerSchema = z.object({
@@ -66,6 +67,14 @@ export async function POST(request: Request) {
     hasPassword: true,
     request,
     metadata: { source: "email_registration" }
+  });
+
+  await sendWelcomeMessage({
+    adminClient,
+    userId: authData.user.id,
+    email: body.data.email,
+    firstName: body.data.first_name,
+    role: body.data.role
   });
 
   return created({

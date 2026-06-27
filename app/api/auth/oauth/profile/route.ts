@@ -1,5 +1,6 @@
 import { fail, ok } from "@/lib/api";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
+import { sendWelcomeMessage } from "@/lib/welcome";
 import { z } from "zod";
 
 const oauthProfileSchema = z.object({
@@ -111,5 +112,13 @@ export async function POST(request: Request) {
     .single();
 
   if (loadError) return fail("Profile created but could not be loaded", 400, loadError.message);
+  await sendWelcomeMessage({
+    adminClient,
+    userId: userData.user.id,
+    email,
+    firstName,
+    role: body.data.role
+  });
+
   return ok({ profile, needs_profile: false });
 }
