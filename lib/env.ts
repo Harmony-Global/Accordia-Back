@@ -8,8 +8,15 @@ function readEnv(name: string) {
   return value;
 }
 
+function readOptionalEnv(name: string) {
+  const value = process.env[name];
+  return value && value.trim().length > 0 ? value : undefined;
+}
+
 export const env = {
   supabaseUrl: readEnv("NEXT_PUBLIC_SUPABASE_URL"),
   supabaseAnonKey: readEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
-  supabaseServiceRoleKey: readEnv("SUPABASE_SERVICE_ROLE_KEY")
+  supabaseServiceRoleKey: readEnv("SUPABASE_SERVICE_ROLE_KEY"),
+  appFrontendUrl: readOptionalEnv("APP_FRONTEND_URL"),
+  passwordResetRedirectUrl: readOptionalEnv("PASSWORD_RESET_REDIRECT_URL")
 };

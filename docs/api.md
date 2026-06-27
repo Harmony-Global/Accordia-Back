@@ -20,6 +20,20 @@ Errors use:
 - `POST /api/auth/login`
   - Body: `{ "email", "password" }`
   - Rejects inactive profiles.
+- `POST /api/auth/oauth/profile`
+  - Authorization: `Bearer <supabase-access-token>` from Google OAuth.
+  - Body for new Google users: `{ "role": "client" | "professional", "phone", "first_name"?, "last_name"? }`
+  - Creates the missing Accordia profile after Supabase Google sign-in, or returns the existing profile.
+- `POST /api/auth/oauth/google`
+  - Body: `{ "redirect_to" }`
+  - Returns a Supabase Google OAuth URL for the frontend to navigate to.
+- `POST /api/auth/password/forgot`
+  - Body: `{ "email", "redirect_to"? }`
+  - Sends a Supabase reset email only for active users with an existing password record.
+- `POST /api/auth/password/reset`
+  - Authorization: `Bearer <supabase-access-token>` from the password recovery session.
+  - Body: `{ "password" }`
+  - Updates the password and records the password log event.
 
 ## Profile and Onboarding
 

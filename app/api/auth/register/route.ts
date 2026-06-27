@@ -1,4 +1,5 @@
 import { created, fail } from "@/lib/api";
+import { recordPasswordLog } from "@/lib/password-log";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { createSupabasePublic } from "@/lib/supabase/public";
 import { z } from "zod";
@@ -57,6 +58,15 @@ export async function POST(request: Request) {
       return fail("Could not create professional profile", 400, error.message);
     }
   }
+
+  await recordPasswordLog({
+    userId: authData.user.id,
+    email: body.data.email,
+    eventType: "password_created",
+    hasPassword: true,
+    request,
+    metadata: { source: "email_registration" }
+  });
 
   return created({
     user: {
