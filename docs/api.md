@@ -113,7 +113,19 @@ Errors use:
 - `POST /api/jobs/:jobId/awards/seal`
   - Client only. Finalizes all selected applications for the job.
   - Selected applications become `awarded`; remaining reviewable applications become `not_awarded`.
-  - Creates award/not-awarded notifications, writes audit logs, removes the job from professional feeds, and blocks new applications.
+  - Creates award/not-awarded notifications, opens one chat conversation per awarded professional, writes audit logs, removes the job from professional feeds, and blocks new applications.
+  - Returns `{ "job_id", "awarded_application_ids", "conversation_ids" }`.
+
+## Conversations
+
+- `GET /api/conversations`
+  - Query: `job_id?`
+  - Returns sealed-award chat conversations visible to the caller.
+- `GET /api/conversations/:conversationId/messages`
+  - Returns messages in a visible conversation.
+- `POST /api/conversations/:conversationId/messages`
+  - Body: `{ "body" }`
+  - Sends a message to the other participant and creates an in-app notification.
 
 ## Messages
 
@@ -122,7 +134,7 @@ Errors use:
   - Returns messages for the caller with sender, receiver, job, and application context.
 - `POST /api/messages`
   - Body: `{ "receiver_id", "job_id", "application_id"?, "body" }`
-  - Sender and receiver must be valid job participants.
+  - Legacy direct-message route. Sender and receiver must be valid job participants. After awards are sealed, use conversation routes.
 - `PATCH /api/messages/read`
   - Body: `{ "job_id", "sender_id"? }`
   - Marks matching messages received by the caller as read.

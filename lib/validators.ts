@@ -78,6 +78,10 @@ export const messageSchema = z.object({
   body: z.string().min(1).max(3000)
 });
 
+export const conversationMessageSchema = z.object({
+  body: z.string().min(1).max(3000)
+});
+
 export const markMessagesReadSchema = z.object({
   job_id: z.string().uuid(),
   sender_id: z.string().uuid().optional()
