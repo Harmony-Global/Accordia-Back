@@ -1,10 +1,11 @@
 import { fail, ok } from "@/lib/api";
 import { requireUser } from "@/lib/auth";
 import { hasCompletedPasswordLog, recordPasswordLog } from "@/lib/password-log";
+import { passwordSchema } from "@/lib/validators";
 import { z } from "zod";
 
 const resetPasswordSchema = z.object({
-  password: z.string().min(8)
+  password: passwordSchema
 });
 
 export async function POST(request: Request) {

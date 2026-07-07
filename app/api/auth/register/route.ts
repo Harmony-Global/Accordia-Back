@@ -2,12 +2,13 @@ import { created, fail } from "@/lib/api";
 import { recordPasswordLog } from "@/lib/password-log";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { createSupabasePublic } from "@/lib/supabase/public";
+import { passwordSchema } from "@/lib/validators";
 import { sendWelcomeMessage } from "@/lib/welcome";
 import { z } from "zod";
 
 const registerSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(8),
+  password: passwordSchema,
   phone: z.string().min(7),
   role: z.enum(["professional", "client"]),
   first_name: z.string().min(1),

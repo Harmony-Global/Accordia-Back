@@ -126,6 +126,48 @@ Errors use:
 - `POST /api/conversations/:conversationId/messages`
   - Body: `{ "body" }`
   - Sends a message to the other participant and creates an in-app notification.
+- `PATCH /api/conversations/:conversationId/read`
+  - Marks only the caller's received messages in that conversation as read.
+
+## Professional Inquiries
+
+- `GET /api/professional-inquiries`
+  - Lists profile-search inquiry chats for the current client/professional.
+- `POST /api/professional-inquiries`
+  - Client only.
+  - Body: `{ "professional_id", "service_id"?, "message" }`
+  - Opens or reuses an inquiry conversation and sends the first message.
+- `GET /api/professional-inquiries/:inquiryId/messages`
+  - Returns messages in a visible inquiry.
+- `POST /api/professional-inquiries/:inquiryId/messages`
+  - Body: `{ "body" }`
+  - Sends a message to the other inquiry participant.
+- `PATCH /api/professional-inquiries/:inquiryId/read`
+  - Marks only the caller's received messages in that inquiry as read.
+
+## Appointments
+
+- `GET /api/appointments/availability`
+  - Professional: returns the caller's availability slots.
+  - Client/admin: pass `professional_id=<profile-uuid>` to view a professional's open future slots.
+- `POST /api/appointments/availability`
+  - Professional only.
+  - Body: `{ "service_id"?, "starts_at", "ends_at", "note"? }`
+  - Creates an optional appointment slot. A supplied service must belong to the professional.
+  - Open/booked slots cannot overlap another open/booked slot for the same professional.
+- `DELETE /api/appointments/availability/:availabilityId`
+  - Professional only. Removes an owned unbooked availability slot.
+- `GET /api/appointments`
+  - Lists appointment requests visible to the caller.
+  - Clients see their requested bookings; professionals see requests for their slots; admins see all.
+- `POST /api/appointments`
+  - Client only.
+  - Body: `{ "availability_id", "service_id"?, "inquiry_id"?, "note"? }`
+  - Transactionally reserves an open future slot as `requested`, marks the slot `booked`, writes an audit log, and notifies the professional.
+- `PATCH /api/appointments/:appointmentId/status`
+  - Body: `{ "status": "accepted" | "declined" | "cancelled" | "completed" }`
+  - Professionals can accept, decline, or complete. Clients can cancel. Declined/cancelled future slots reopen.
+  - Status changes write audit logs and notify the other participant.
 
 ## Messages
 

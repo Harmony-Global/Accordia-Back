@@ -1,6 +1,29 @@
 import { fail, ok, parseSearchParams } from "@/lib/api";
 import { requireUser } from "@/lib/auth";
 
+type ProfessionalProfilePayload = {
+  professional_services?: Array<{ is_active?: boolean }> | null;
+};
+
+type ConversationPayload = {
+  professional?: {
+    professional_profiles?: ProfessionalProfilePayload | ProfessionalProfilePayload[] | null;
+  } | null;
+};
+
+function filterInactiveOfferings(conversation: ConversationPayload) {
+  const profiles = conversation.professional?.professional_profiles;
+  const profileList = Array.isArray(profiles) ? profiles : profiles ? [profiles] : [];
+
+  for (const profile of profileList) {
+    if (Array.isArray(profile.professional_services)) {
+      profile.professional_services = profile.professional_services.filter((service) => service.is_active);
+    }
+  }
+
+  return conversation;
+}
+
 export async function GET(request: Request) {
   const auth = await requireUser(request);
   if (auth instanceof Response) return auth;
@@ -22,5 +45,5 @@ export async function GET(request: Request) {
   const { data, error } = await query;
   if (error) return fail("Could not load conversations", 400, error.message);
 
-  return ok({ conversations: data });
+  return ok({ conversations: (data ?? []).map((conversation) => filterInactiveOfferings(conversation as ConversationPayload)) });
 }

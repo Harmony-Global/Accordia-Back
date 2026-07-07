@@ -1,5 +1,11 @@
 import { z } from "zod";
 
+export const passwordSchema = z
+  .string()
+  .min(8, "Password must be at least 8 characters and contain letters and numbers")
+  .regex(/[A-Za-z]/, "Password must contain at least one letter")
+  .regex(/\d/, "Password must contain at least one number");
+
 export const profilePatchSchema = z.object({
   first_name: z.string().min(1).optional(),
   last_name: z.string().min(1).optional(),
@@ -80,6 +86,30 @@ export const messageSchema = z.object({
 
 export const conversationMessageSchema = z.object({
   body: z.string().min(1).max(3000)
+});
+
+export const professionalInquirySchema = z.object({
+  professional_id: z.string().uuid(),
+  service_id: z.string().uuid().nullable().optional(),
+  message: z.string().min(1).max(3000)
+});
+
+export const availabilityCreateSchema = z.object({
+  service_id: z.string().uuid().nullable().optional(),
+  starts_at: z.string().datetime(),
+  ends_at: z.string().datetime(),
+  note: z.string().max(1000).nullable().optional()
+});
+
+export const appointmentCreateSchema = z.object({
+  availability_id: z.string().uuid(),
+  service_id: z.string().uuid().nullable().optional(),
+  inquiry_id: z.string().uuid().nullable().optional(),
+  note: z.string().max(1000).nullable().optional()
+});
+
+export const appointmentStatusSchema = z.object({
+  status: z.enum(["accepted", "declined", "cancelled", "completed"])
 });
 
 export const markMessagesReadSchema = z.object({
