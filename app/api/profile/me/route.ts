@@ -8,7 +8,30 @@ export async function GET(request: Request) {
 
   const { data: profile, error } = await auth.adminClient
     .from("profiles")
-    .select("*, professional_profiles(*, professional_categories(category:categories(*)), professional_services(*, category:categories(*)))")
+    .select(`
+      id,
+      email,
+      phone,
+      role,
+      first_name,
+      last_name,
+      avatar_url,
+      phone_verified,
+      is_active,
+      created_at,
+      updated_at,
+      professional_profiles(
+        id,
+        user_id,
+        bio,
+        years_experience,
+        location,
+        state,
+        is_available,
+        professional_categories(category:categories(id, name, slug, icon, description)),
+        professional_services(id, professional_id, category_id, offering_type, title, description, image_url, price_min, price_max, currency, is_active, created_at, updated_at, category:categories(id, name, slug, icon))
+      )
+    `)
     .eq("id", auth.userId)
     .single();
 

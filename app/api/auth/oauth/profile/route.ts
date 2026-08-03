@@ -1,4 +1,5 @@
 import { fail, ok } from "@/lib/api";
+import { issueAppSession } from "@/lib/session-lock";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { sendWelcomeMessage } from "@/lib/welcome";
 import { z } from "zod";
@@ -36,7 +37,12 @@ export async function POST(request: Request) {
   if (existingError) return fail("Could not load profile", 400, existingError.message);
   if (existingProfile) {
     if (!existingProfile.is_active) return fail("Account is inactive", 403);
-    return ok({ profile: existingProfile, needs_profile: false });
+    try {
+      const appSessionId = await issueAppSession(adminClient, userData.user.id, request);
+      return ok({ profile: existingProfile, needs_profile: false, app_session_id: appSessionId });
+    } catch (sessionError) {
+      return fail("Could not create secure app session", 500, sessionError instanceof Error ? sessionError.message : sessionError);
+    }
   }
 
   const body = oauthProfileSchema.safeParse(await request.json());
@@ -120,5 +126,10 @@ export async function POST(request: Request) {
     role: body.data.role
   });
 
-  return ok({ profile, needs_profile: false });
+  try {
+    const appSessionId = await issueAppSession(adminClient, userData.user.id, request);
+    return ok({ profile, needs_profile: false, app_session_id: appSessionId });
+  } catch (sessionError) {
+    return fail("Could not create secure app session", 500, sessionError instanceof Error ? sessionError.message : sessionError);
+  }
 }

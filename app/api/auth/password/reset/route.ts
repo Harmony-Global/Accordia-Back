@@ -9,7 +9,7 @@ const resetPasswordSchema = z.object({
 });
 
 export async function POST(request: Request) {
-  const auth = await requireUser(request);
+  const auth = await requireUser(request, { enforceAppSession: false });
   if (auth instanceof Response) return auth;
 
   const body = resetPasswordSchema.safeParse(await request.json());

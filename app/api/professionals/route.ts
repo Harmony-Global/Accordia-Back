@@ -6,7 +6,11 @@ type SearchCategoryLink = {
     id: string;
     name: string;
     slug: string;
-  } | null;
+  } | {
+    id: string;
+    name: string;
+    slug: string;
+  }[] | null;
 };
 
 type SearchService = {
@@ -34,6 +38,10 @@ function normalize(value: string | null) {
   return value?.trim().toLowerCase() ?? "";
 }
 
+function categoryValue(link: SearchCategoryLink) {
+  return Array.isArray(link.category) ? link.category[0] : link.category;
+}
+
 function professionalMatchesQuery(professional: SearchProfessional, query: string) {
   if (!query) return true;
 
@@ -43,7 +51,7 @@ function professionalMatchesQuery(professional: SearchProfessional, query: strin
     professional.bio,
     professional.location,
     professional.state,
-    ...(professional.professional_categories ?? []).map((item) => item.category?.name),
+    ...(professional.professional_categories ?? []).map((item) => categoryValue(item)?.name),
     ...(professional.professional_services ?? []).map((service) => service.title),
     ...(professional.professional_services ?? []).map((service) => service.description)
   ]
@@ -65,7 +73,19 @@ export async function GET(request: Request) {
 
   const { data, error } = await auth.adminClient
     .from("professional_profiles")
-    .select("*, profile:profiles!professional_profiles_user_id_fkey(id, first_name, last_name, avatar_url, phone_verified, is_active), professional_categories(category:categories(*)), professional_services(*, category:categories(*))")
+    .select(`
+      id,
+      user_id,
+      bio,
+      years_experience,
+      location,
+      state,
+      is_available,
+      updated_at,
+      profile:profiles!professional_profiles_user_id_fkey(id, first_name, last_name, avatar_url, phone_verified, is_active),
+      professional_categories(category:categories(id, name, slug, icon)),
+      professional_services(id, professional_id, category_id, offering_type, title, description, image_url, price_min, price_max, currency, is_active, created_at, updated_at, category:categories(id, name, slug, icon))
+    `)
     .eq("is_available", true)
     .order("updated_at", { ascending: false })
     .limit(80);
@@ -84,7 +104,7 @@ export async function GET(request: Request) {
     .filter((professional) => !state || normalize(professional.state ?? professional.location ?? "").includes(state))
     .filter((professional) => {
       if (!categoryId) return true;
-      const categoryMatch = (professional.professional_categories ?? []).some((item) => item.category?.id === categoryId);
+      const categoryMatch = (professional.professional_categories ?? []).some((item) => categoryValue(item)?.id === categoryId);
       const serviceMatch = (professional.professional_services ?? []).some((service) => service.category_id === categoryId);
       return categoryMatch || serviceMatch;
     })

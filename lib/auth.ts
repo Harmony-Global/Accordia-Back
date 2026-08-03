@@ -1,4 +1,5 @@
 import { fail } from "@/lib/api";
+import { ensureActiveAppSession } from "@/lib/session-lock";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { createSupabaseForToken } from "@/lib/supabase/user";
 
@@ -12,13 +13,18 @@ export type AuthContext = {
   adminClient: ReturnType<typeof createSupabaseAdmin>;
 };
 
+type RequireUserOptions = {
+  enforceAppSession?: boolean;
+};
+
 function getBearerToken(request: Request) {
   const header = request.headers.get("authorization");
   if (!header?.startsWith("Bearer ")) return null;
   return header.slice("Bearer ".length);
 }
 
-export async function requireUser(request: Request): Promise<AuthContext | Response> {
+export async function requireUser(request: Request, options: RequireUserOptions = {}): Promise<AuthContext | Response> {
+  const shouldEnforceAppSession = options.enforceAppSession ?? true;
   const accessToken = getBearerToken(request);
   if (!accessToken) return fail("Missing bearer token", 401);
 
@@ -38,6 +44,11 @@ export async function requireUser(request: Request): Promise<AuthContext | Respo
 
   if (profileError || !profile?.is_active) {
     return fail("Profile not found or inactive", 403);
+  }
+
+  if (shouldEnforceAppSession) {
+    const sessionError = await ensureActiveAppSession(adminClient, userData.user.id, request);
+    if (sessionError) return sessionError;
   }
 
   return {
