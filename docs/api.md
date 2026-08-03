@@ -85,7 +85,8 @@ Errors use:
   - Returns RLS-visible jobs. `mine=true` filters to the caller's client jobs.
 - `POST /api/jobs`
   - Client only.
-  - Body: `{ "category_id", "title", "description", "location"?, "state"?, "is_remote"?, "start_date"?, "end_date"? }`
+  - Body: `{ "category_id", "title", "description", "number_of_professionals"?, "location"?, "state"?, "is_remote"?, "start_date"?, "end_date"? }`
+  - `number_of_professionals` defaults to `1` and must be an integer from `1` to `50`.
   - Client job payloads do not include budget or price-range fields.
   - Creates a job and initial progress entry.
 - `GET /api/jobs/feed`

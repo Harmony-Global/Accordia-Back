@@ -1,5 +1,23 @@
 import { z } from "zod";
 
+export const CONTACT_INFO_MESSAGE = "For safety, keep communication inside Accordia. Do not share phone numbers, email addresses, or external contact links in messages.";
+
+const emailPattern = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
+const phonePattern = /\+?\d[\d\s().-]{7,}\d/g;
+const urlPattern = /\b(?:https?:\/\/|www\.)\S+/i;
+
+function containsContactInfo(value: string) {
+  if (emailPattern.test(value) || urlPattern.test(value)) return true;
+  const candidates = value.match(phonePattern) ?? [];
+  return candidates.some((candidate) => candidate.replace(/\D/g, "").length >= 9);
+}
+
+const safeMessageText = z
+  .string()
+  .min(1)
+  .max(3000)
+  .refine((value) => !containsContactInfo(value), CONTACT_INFO_MESSAGE);
+
 export const passwordSchema = z
   .string()
   .min(8, "Password must be at least 8 characters and contain letters and numbers")
@@ -56,6 +74,7 @@ export const createJobSchema = z.object({
   category_id: z.string().uuid(),
   title: z.string().min(5).max(180),
   description: z.string().min(20),
+  number_of_professionals: z.number().int().min(1).max(50).default(1),
   location: z.string().nullable().optional(),
   state: z.string().nullable().optional(),
   is_remote: z.boolean().default(false),
@@ -81,17 +100,17 @@ export const messageSchema = z.object({
   receiver_id: z.string().uuid(),
   job_id: z.string().uuid(),
   application_id: z.string().uuid().nullable().optional(),
-  body: z.string().min(1).max(3000)
+  body: safeMessageText
 });
 
 export const conversationMessageSchema = z.object({
-  body: z.string().min(1).max(3000)
+  body: safeMessageText
 });
 
 export const professionalInquirySchema = z.object({
   professional_id: z.string().uuid(),
   service_id: z.string().uuid().nullable().optional(),
-  message: z.string().min(1).max(3000)
+  message: safeMessageText
 });
 
 export const availabilityCreateSchema = z.object({
@@ -118,7 +137,7 @@ export const markMessagesReadSchema = z.object({
 });
 
 export const progressSchema = z.object({
-  status: z.enum(["in_progress", "in_review", "delivered", "closed", "cancelled"]),
+  status: z.enum(["in_progress", "in_review", "delivered", "completed", "closed", "cancelled"]),
   note: z.string().max(2000).nullable().optional()
 });
 

@@ -26,7 +26,7 @@ export async function GET(request: Request) {
 
   let query = auth.adminClient
     .from("professional_services")
-    .select("*, category:categories(*)")
+    .select("id, professional_id, category_id, offering_type, title, description, image_url, price_min, price_max, currency, is_active, created_at, updated_at, category:categories(id, name, slug, icon)")
     .eq("professional_id", professionalId)
     .order("created_at", { ascending: false });
 
@@ -77,7 +77,7 @@ export async function POST(request: Request) {
       ...body.data,
       professional_id: auth.userId
     })
-    .select("*, category:categories(*)")
+    .select("id, professional_id, category_id, offering_type, title, description, image_url, price_min, price_max, currency, is_active, created_at, updated_at, category:categories(id, name, slug, icon)")
     .single();
 
   if (error) return fail("Could not create professional service", 400, error.message);

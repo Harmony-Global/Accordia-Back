@@ -1,5 +1,6 @@
 import { created, fail } from "@/lib/api";
 import { recordPasswordLog } from "@/lib/password-log";
+import { issueAppSession } from "@/lib/session-lock";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { createSupabasePublic } from "@/lib/supabase/public";
 import { passwordSchema } from "@/lib/validators";
@@ -78,6 +79,15 @@ export async function POST(request: Request) {
     role: body.data.role
   });
 
+  let appSessionId: string | null = null;
+  if (authData.session?.access_token) {
+    try {
+      appSessionId = await issueAppSession(adminClient, authData.user.id, request);
+    } catch (sessionError) {
+      return fail("Could not create secure app session", 500, sessionError instanceof Error ? sessionError.message : sessionError);
+    }
+  }
+
   return created({
     user: {
       id: authData.user.id,
@@ -85,6 +95,7 @@ export async function POST(request: Request) {
       phone: body.data.phone,
       role: body.data.role
     },
-    session: authData.session
+    session: authData.session,
+    app_session_id: appSessionId
   });
 }

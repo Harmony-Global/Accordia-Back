@@ -18,7 +18,27 @@ export async function GET(request: Request, { params }: Params) {
 
   const { data, error } = await auth.adminClient
     .from("applications")
-    .select("*, professional:profiles!applications_professional_id_fkey(id, first_name, last_name, phone_verified, avatar_url, professional_profiles(*, professional_categories(category:categories(*)), professional_services(*, category:categories(*))))")
+    .select(`
+      *,
+      professional:profiles!applications_professional_id_fkey(
+        id,
+        first_name,
+        last_name,
+        phone_verified,
+        avatar_url,
+        professional_profiles(
+          id,
+          user_id,
+          bio,
+          years_experience,
+          location,
+          state,
+          is_available,
+          professional_categories(category:categories(id, name, slug, icon)),
+          professional_services(id, professional_id, category_id, offering_type, title, description, image_url, price_min, price_max, currency, is_active, created_at, updated_at, category:categories(id, name, slug, icon))
+        )
+      )
+    `)
     .eq("job_id", params.jobId)
     .order("created_at", { ascending: false });
 
