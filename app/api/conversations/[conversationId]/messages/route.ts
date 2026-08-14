@@ -3,7 +3,20 @@ import { requireUser } from "@/lib/auth";
 import { conversationMessageSchema } from "@/lib/validators";
 
 type Params = { params: { conversationId: string } };
-type ConversationJob = { title?: string | null } | { title?: string | null }[] | null;
+type ConversationJob = { title?: string | null; is_remote?: boolean | null } | { title?: string | null; is_remote?: boolean | null }[] | null;
+const EMAIL_PATTERN = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
+const PHONE_PATTERN = /\+?\d[\d\s().-]{7,}\d/g;
+const URL_PATTERN = /\b(?:https?:\/\/|www\.)\S+/i;
+
+function containsContactInfo(value: string) {
+  if (EMAIL_PATTERN.test(value) || URL_PATTERN.test(value)) return true;
+  const candidates = value.match(PHONE_PATTERN) ?? [];
+  return candidates.some((candidate) => candidate.replace(/\D/g, "").length >= 9);
+}
+
+function normalizeJob(job: ConversationJob) {
+  return Array.isArray(job) ? job[0] : job;
+}
 
 function canUseConversation(
   conversation: { client_id: string; professional_id: string; status: string },
@@ -47,13 +60,19 @@ export async function POST(request: Request, { params }: Params) {
 
   const { data: conversation, error: conversationError } = await auth.adminClient
     .from("job_conversations")
-    .select("id, job_id, application_id, client_id, professional_id, status, job:jobs(id, title)")
+    .select("id, job_id, application_id, client_id, professional_id, status, upfront_payment_made_at, job:jobs(id, title, is_remote)")
     .eq("id", params.conversationId)
     .single();
 
   if (conversationError || !conversation) return fail("Conversation not found", 404, conversationError?.message);
   if (!canUseConversation(conversation, auth)) return fail("Forbidden for this conversation", 403);
   if (conversation.status !== "open") return fail("This conversation is not open", 409);
+
+  const conversationJob = normalizeJob(conversation.job as ConversationJob);
+  const contactInfoAllowed = Boolean(conversation.upfront_payment_made_at && conversationJob?.is_remote === false);
+  if (containsContactInfo(body.data.body) && !contactInfoAllowed) {
+    return fail("This message was blocked for sharing contact details before contact exchange is available.", 422);
+  }
 
   const receiverId = conversation.client_id === auth.userId
     ? conversation.professional_id
@@ -74,8 +93,7 @@ export async function POST(request: Request, { params }: Params) {
 
   if (error) return fail("Could not send message", 400, error.message);
 
-  const conversationJob = conversation.job as ConversationJob;
-  const jobTitle = Array.isArray(conversationJob) ? conversationJob[0]?.title : conversationJob?.title;
+  const jobTitle = conversationJob?.title;
   await auth.adminClient.from("notifications").insert({
     user_id: receiverId,
     type: "conversation_message",
