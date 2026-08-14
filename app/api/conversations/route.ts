@@ -33,7 +33,8 @@ export async function GET(request: Request) {
 
   let query = auth.adminClient
     .from("job_conversations")
-    .select("*, job:jobs(id, title, status, category:categories(*)), application:applications(id, status, pitch, reference_image_urls), client:profiles!job_conversations_client_id_fkey(id, first_name, last_name, avatar_url, phone_verified), professional:profiles!job_conversations_professional_id_fkey(id, first_name, last_name, avatar_url, phone_verified, professional_profiles(*, professional_categories(category:categories(*)), professional_services(*, category:categories(*))))")
+    .select("*, job:jobs(id, title, status, category:categories(*)), application:applications(id, status, pitch, proposed_rate, estimated_days, reference_image_urls, proposal_attachments), client:profiles!job_conversations_client_id_fkey(id, first_name, last_name, avatar_url, phone_verified), professional:profiles!job_conversations_professional_id_fkey(id, first_name, last_name, avatar_url, phone_verified, professional_profiles(*, professional_categories(category:categories(*)), professional_services(*, category:categories(*))))")
+    .eq("status", "open")
     .order("created_at", { ascending: false });
 
   if (auth.role !== "admin") {
