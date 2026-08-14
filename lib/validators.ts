@@ -87,6 +87,7 @@ export const updateJobSchema = createJobSchema.partial().strict();
 export const applySchema = z.object({
   pitch: z.string().min(20).max(3000),
   proposed_rate: z.number().min(0).nullable().optional(),
+  estimated_days: z.number().int().min(1).max(365).nullable().optional(),
   reference_image_urls: z.array(z.string().max(1_500_000)).min(1, "You need to attach supporting images for your application").max(3)
 });
 

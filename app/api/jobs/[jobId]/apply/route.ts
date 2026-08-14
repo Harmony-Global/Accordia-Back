@@ -18,14 +18,18 @@ export async function POST(request: Request, { params }: Params) {
   });
 
   if (error) return fail("Could not apply to job", 400, error.message);
-  if (body.data.reference_image_urls?.length) {
+  const update: Record<string, unknown> = {};
+  if (body.data.reference_image_urls?.length) update.reference_image_urls = body.data.reference_image_urls;
+  if (body.data.estimated_days !== undefined) update.estimated_days = body.data.estimated_days;
+
+  if (Object.keys(update).length > 0) {
     const { error: referenceError } = await auth.adminClient
       .from("applications")
-      .update({ reference_image_urls: body.data.reference_image_urls })
+      .update(update)
       .eq("id", data)
       .eq("professional_id", auth.userId);
 
-    if (referenceError) return fail("Application created, but references could not be saved", 400, referenceError.message);
+    if (referenceError) return fail("Application created, but proposal details could not be saved", 400, referenceError.message);
   }
 
   return created({ application_id: data });
