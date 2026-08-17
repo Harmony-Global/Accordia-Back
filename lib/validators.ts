@@ -108,6 +108,10 @@ export const conversationMessageSchema = z.object({
   body: safeMessageText
 });
 
+export const revisionRequestSchema = z.object({
+  note: z.string().min(10).max(2000)
+}).strict();
+
 export const professionalInquirySchema = z.object({
   professional_id: z.string().uuid(),
   service_id: z.string().uuid().nullable().optional(),

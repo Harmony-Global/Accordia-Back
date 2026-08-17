@@ -12,7 +12,54 @@ export async function GET(request: Request) {
 
   let query = auth.userClient
     .from("jobs")
-    .select("*, categories(*), client:profiles!jobs_client_id_fkey(id, first_name, last_name, phone_verified), applications(id, status)")
+    .select(`
+      *,
+      categories(*),
+      client:profiles!jobs_client_id_fkey(id, first_name, last_name, phone_verified),
+      applications(
+        id,
+        job_id,
+        professional_id,
+        status,
+        chat_invited_at,
+        proposed_rate,
+        created_at,
+        updated_at,
+        professional:profiles!applications_professional_id_fkey(
+          id,
+          first_name,
+          last_name,
+          phone_verified,
+          avatar_url,
+          professional_profiles(
+            id,
+            user_id,
+            bio,
+            years_experience,
+            location,
+            state,
+            is_available,
+            professional_categories(category:categories(id, name, slug, icon)),
+            professional_services(
+              id,
+              professional_id,
+              category_id,
+              offering_type,
+              title,
+              description,
+              image_url,
+              price_min,
+              price_max,
+              currency,
+              is_active,
+              created_at,
+              updated_at,
+              category:categories(id, name, slug, icon)
+            )
+          )
+        )
+      )
+    `)
     .order("created_at", { ascending: false })
     .limit(50);
 
@@ -21,6 +68,73 @@ export async function GET(request: Request) {
 
   const { data, error } = await query;
   if (error) return fail("Could not load jobs", 400, error.message);
+
+  if (mine && data?.length) {
+    const jobIds = data.map((job) => job.id);
+    const { data: rejectedApplications, error: rejectedApplicationsError } = await auth.adminClient
+      .from("applications")
+      .select(`
+        id,
+        job_id,
+        professional_id,
+        status,
+        chat_invited_at,
+        proposed_rate,
+        created_at,
+        updated_at,
+        professional:profiles!applications_professional_id_fkey(
+          id,
+          first_name,
+          last_name,
+          phone_verified,
+          avatar_url,
+          professional_profiles(
+            id,
+            user_id,
+            bio,
+            years_experience,
+            location,
+            state,
+            is_available,
+            professional_categories(category:categories(id, name, slug, icon)),
+            professional_services(
+              id,
+              professional_id,
+              category_id,
+              offering_type,
+              title,
+              description,
+              image_url,
+              price_min,
+              price_max,
+              currency,
+              is_active,
+              created_at,
+              updated_at,
+              category:categories(id, name, slug, icon)
+            )
+          )
+        )
+      `)
+      .in("job_id", jobIds)
+      .in("status", ["rejected", "not_awarded"])
+      .order("updated_at", { ascending: false });
+
+    if (rejectedApplicationsError) return fail("Could not load rejected applications", 400, rejectedApplicationsError.message);
+
+    const rejectedByJob = new Map<string, typeof rejectedApplications>();
+    for (const application of rejectedApplications ?? []) {
+      rejectedByJob.set(application.job_id, [...(rejectedByJob.get(application.job_id) ?? []), application]);
+    }
+
+    return ok({
+      jobs: data.map((job) => ({
+        ...job,
+        rejected_applications: rejectedByJob.get(job.id) ?? []
+      }))
+    });
+  }
+
   return ok({ jobs: data });
 }
 

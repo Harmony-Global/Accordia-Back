@@ -1,4 +1,5 @@
 import { fail, ok } from "@/lib/api";
+import { conversationSelect } from "@/lib/conversations";
 import { requireUser } from "@/lib/auth";
 
 type Params = { params: { conversationId: string } };
@@ -63,7 +64,7 @@ export async function POST(request: Request, { params }: Params) {
 
   const { data: updatedConversation, error: updatedError } = await auth.adminClient
     .from("job_conversations")
-    .select("*, job:jobs(id, title, status, is_remote, category:categories(*)), application:applications(id, status, pitch, proposed_rate, estimated_days, reference_image_urls, proposal_attachments), client:profiles!job_conversations_client_id_fkey(id, first_name, last_name, avatar_url, phone_verified), professional:profiles!job_conversations_professional_id_fkey(id, first_name, last_name, avatar_url, phone_verified, professional_profiles(*, professional_categories(category:categories(*)), professional_services(*, category:categories(*))))")
+    .select(conversationSelect)
     .eq("id", conversation.id)
     .single();
 
