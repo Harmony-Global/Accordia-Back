@@ -112,6 +112,15 @@ export const revisionRequestSchema = z.object({
   note: z.string().min(10).max(2000)
 }).strict();
 
+export const conversationReviewSchema = z.object({
+  rating: z.number().int().min(1).max(5).nullable().optional(),
+  review_text: z.string().max(2000).nullable().optional(),
+  skipped: z.boolean().default(false)
+}).strict().refine((data) => data.skipped || typeof data.rating === "number", {
+  message: "Rating is required unless the review is skipped",
+  path: ["rating"]
+});
+
 export const professionalInquirySchema = z.object({
   professional_id: z.string().uuid(),
   service_id: z.string().uuid().nullable().optional(),
