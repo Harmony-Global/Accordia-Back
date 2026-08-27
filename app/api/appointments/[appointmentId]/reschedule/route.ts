@@ -162,7 +162,7 @@ export async function POST(request: Request, { params }: Params) {
     action: "reschedule_requested",
     previous_status: appointment.status,
     next_status: appointment.status,
-    details: {
+    metadata: {
       reschedule_request_id: rescheduleRequest.id,
       previous_starts_at: appointment.starts_at,
       previous_ends_at: appointment.ends_at,

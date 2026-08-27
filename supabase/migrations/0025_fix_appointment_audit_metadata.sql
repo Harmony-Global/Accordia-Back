@@ -1,3 +1,21 @@
+alter table public.appointment_audit_logs
+drop constraint if exists appointment_audit_logs_action_check;
+
+alter table public.appointment_audit_logs
+add constraint appointment_audit_logs_action_check
+check (
+  action in (
+    'requested',
+    'accepted',
+    'declined',
+    'cancelled',
+    'completed',
+    'reschedule_requested',
+    'reschedule_accepted',
+    'reschedule_declined'
+  )
+);
+
 create or replace function public.update_appointment_status(
   p_appointment_id uuid,
   p_status text
