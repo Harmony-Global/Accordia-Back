@@ -145,6 +145,16 @@ export const appointmentStatusSchema = z.object({
   status: z.enum(["accepted", "declined", "cancelled", "completed"])
 });
 
+export const appointmentRescheduleCreateSchema = z.object({
+  starts_at: z.string().datetime(),
+  ends_at: z.string().datetime(),
+  note: z.string().max(1000).nullable().optional()
+}).strict();
+
+export const appointmentRescheduleResponseSchema = z.object({
+  status: z.enum(["accepted", "declined"])
+}).strict();
+
 export const markMessagesReadSchema = z.object({
   job_id: z.string().uuid(),
   sender_id: z.string().uuid().optional()

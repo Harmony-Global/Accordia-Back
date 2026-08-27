@@ -2,13 +2,15 @@ import { created, fail, ok } from "@/lib/api";
 import { requireRole, requireUser } from "@/lib/auth";
 import { appointmentCreateSchema } from "@/lib/validators";
 
+const appointmentSelect = "*, client:profiles!appointments_client_id_fkey(id, first_name, last_name, avatar_url, phone_verified), professional:profiles!appointments_professional_id_fkey(id, first_name, last_name, avatar_url, phone_verified, professional_profiles(*, professional_categories(category:categories(*)), professional_services(*, category:categories(*)))), service:professional_services(*), availability:professional_availability(*), reschedule_requests:appointment_reschedule_requests(*)";
+
 export async function GET(request: Request) {
   const auth = await requireUser(request);
   if (auth instanceof Response) return auth;
 
   let query = auth.adminClient
     .from("appointments")
-    .select("*, client:profiles!appointments_client_id_fkey(id, first_name, last_name, avatar_url, phone_verified), professional:profiles!appointments_professional_id_fkey(id, first_name, last_name, avatar_url, phone_verified), service:professional_services(*), availability:professional_availability(*)")
+    .select(appointmentSelect)
     .order("starts_at", { ascending: true });
 
   if (auth.role === "client") query = query.eq("client_id", auth.userId);
@@ -40,7 +42,7 @@ export async function POST(request: Request) {
 
   const { data: appointment, error: appointmentError } = await auth.adminClient
     .from("appointments")
-    .select("*, client:profiles!appointments_client_id_fkey(id, first_name, last_name, avatar_url, phone_verified), professional:profiles!appointments_professional_id_fkey(id, first_name, last_name, avatar_url, phone_verified), service:professional_services(*), availability:professional_availability(*)")
+    .select(appointmentSelect)
     .eq("id", requestedAppointment.id)
     .single();
 
