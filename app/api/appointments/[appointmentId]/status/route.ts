@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/auth";
 import { appointmentStatusSchema } from "@/lib/validators";
 
 type Params = { params: { appointmentId: string } };
+const appointmentSelect = "*, client:profiles!appointments_client_id_fkey(id, first_name, last_name, avatar_url, phone_verified), professional:profiles!appointments_professional_id_fkey(id, first_name, last_name, avatar_url, phone_verified, professional_profiles(*, professional_categories(category:categories(*)), professional_services(*, category:categories(*)))), service:professional_services(*), availability:professional_availability(*), reschedule_requests:appointment_reschedule_requests(*)";
 
 export async function PATCH(request: Request, { params }: Params) {
   const auth = await requireUser(request);
@@ -22,7 +23,7 @@ export async function PATCH(request: Request, { params }: Params) {
 
   const { data: appointment, error } = await auth.adminClient
     .from("appointments")
-    .select("*, client:profiles!appointments_client_id_fkey(id, first_name, last_name, avatar_url, phone_verified), professional:profiles!appointments_professional_id_fkey(id, first_name, last_name, avatar_url, phone_verified), service:professional_services(*), availability:professional_availability(*)")
+    .select(appointmentSelect)
     .eq("id", updatedAppointment.id)
     .single();
 

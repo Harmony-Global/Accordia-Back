@@ -21,17 +21,25 @@ type SearchService = {
 };
 
 type SearchProfessional = {
+  id?: string;
+  user_id?: string;
   bio?: string | null;
   location?: string | null;
   state?: string | null;
   is_available: boolean;
   profile?: {
+    id?: string | null;
     first_name?: string | null;
     last_name?: string | null;
     is_active?: boolean;
   } | null;
   professional_categories?: SearchCategoryLink[] | null;
   professional_services?: SearchService[] | null;
+};
+
+type ProfessionalRatingSummary = {
+  rating_average: number | null;
+  review_count: number;
 };
 
 function normalize(value: string | null) {
@@ -60,6 +68,26 @@ function professionalMatchesQuery(professional: SearchProfessional, query: strin
     .toLowerCase();
 
   return searchable.includes(query);
+}
+
+function emptyRatingSummary(): ProfessionalRatingSummary {
+  return {
+    rating_average: null,
+    review_count: 0
+  };
+}
+
+function professionalRatingIds(professional: SearchProfessional) {
+  return [professional.user_id, professional.profile?.id, professional.id].filter(Boolean) as string[];
+}
+
+function getProfessionalRatingSummary(professional: SearchProfessional, ratingSummaries: Map<string, ProfessionalRatingSummary>) {
+  for (const id of professionalRatingIds(professional)) {
+    const summary = ratingSummaries.get(id);
+    if (summary) return summary;
+  }
+
+  return emptyRatingSummary();
 }
 
 export async function GET(request: Request) {
@@ -110,5 +138,38 @@ export async function GET(request: Request) {
     })
     .filter((professional) => professionalMatchesQuery(professional, query));
 
-  return ok({ professionals });
+  const professionalIds = [...new Set(professionals.flatMap((professional) => professionalRatingIds(professional)))];
+  const ratingSummaries = new Map<string, ProfessionalRatingSummary>();
+
+  if (professionalIds.length > 0) {
+    const { data: reviews, error: reviewsError } = await auth.adminClient
+      .from("conversation_reviews")
+      .select("professional_id, rating")
+      .in("professional_id", professionalIds)
+      .eq("skipped", false)
+      .not("rating", "is", null);
+
+    if (reviewsError) return fail("Could not load professional ratings", 400, reviewsError.message);
+
+    for (const review of reviews ?? []) {
+      const professionalId = review.professional_id as string;
+      const rating = Number(review.rating);
+      if (!professionalId || Number.isNaN(rating)) continue;
+
+      const current = ratingSummaries.get(professionalId) ?? emptyRatingSummary();
+      const total = (current.rating_average ?? 0) * current.review_count + rating;
+      const reviewCount = current.review_count + 1;
+      ratingSummaries.set(professionalId, {
+        rating_average: Number((total / reviewCount).toFixed(1)),
+        review_count: reviewCount
+      });
+    }
+  }
+
+  return ok({
+    professionals: professionals.map((professional) => ({
+      ...professional,
+      ...getProfessionalRatingSummary(professional, ratingSummaries)
+    }))
+  });
 }

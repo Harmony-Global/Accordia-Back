@@ -41,6 +41,19 @@ export async function POST(request: Request, { params }: Params) {
   if (updateError || !updatedConversation) return fail("Could not request revision", 400, updateError?.message);
 
   const job = normalizeRelation(conversation.job as ConversationJob);
+  const revisionMessage = body.data.note.trim();
+
+  const { error: messageError } = await auth.adminClient.from("messages").insert({
+    conversation_id: conversation.id,
+    sender_id: conversation.client_id,
+    receiver_id: conversation.professional_id,
+    job_id: conversation.job_id,
+    application_id: conversation.application_id,
+    body: `Revision requested: ${revisionMessage}`
+  });
+
+  if (messageError) return fail("Revision was saved, but could not add it to the conversation", 400, messageError.message);
+
   await auth.adminClient.from("notifications").insert({
     user_id: conversation.professional_id,
     type: "revision_requested",
