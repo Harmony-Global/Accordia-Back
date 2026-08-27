@@ -20,6 +20,20 @@ Errors use:
 - `POST /api/auth/login`
   - Body: `{ "email", "password" }`
   - Rejects inactive profiles.
+- `POST /api/auth/oauth/profile`
+  - Authorization: `Bearer <supabase-access-token>` from Google OAuth.
+  - Body for new Google users: `{ "role": "client" | "professional", "phone", "first_name"?, "last_name"? }`
+  - Creates the missing Accordia profile after Supabase Google sign-in, or returns the existing profile.
+- `POST /api/auth/oauth/google`
+  - Body: `{ "redirect_to" }`
+  - Returns a Supabase Google OAuth URL for the frontend to navigate to.
+- `POST /api/auth/password/forgot`
+  - Body: `{ "email", "redirect_to"? }`
+  - Sends a Supabase reset email only for active users with an existing password record.
+- `POST /api/auth/password/reset`
+  - Authorization: `Bearer <supabase-access-token>` from the password recovery session.
+  - Body: `{ "password" }`
+  - Updates the password and records the password log event.
 
 ## Profile and Onboarding
 
@@ -71,7 +85,8 @@ Errors use:
   - Returns RLS-visible jobs. `mine=true` filters to the caller's client jobs.
 - `POST /api/jobs`
   - Client only.
-  - Body: `{ "category_id", "title", "description", "location"?, "state"?, "is_remote"?, "start_date"?, "end_date"? }`
+  - Body: `{ "category_id", "title", "description", "number_of_professionals"?, "location"?, "state"?, "is_remote"?, "start_date"?, "end_date"? }`
+  - `number_of_professionals` defaults to `1` and must be an integer from `1` to `50`.
   - Client job payloads do not include budget or price-range fields.
   - Creates a job and initial progress entry.
 - `GET /api/jobs/feed`
@@ -91,9 +106,69 @@ Errors use:
 - `GET /api/applications/me`
   - Professional only. Lists the caller's applications with job context.
 - `POST /api/applications/:applicationId/award`
-  - Client only. Awards a pending/reviewed/shortlisted application when the job is still awardable.
-  - Marks competing applications as rejected and creates an in-app notification for each unsuccessful professional.
-  - The awarded job is removed from professional feeds and cannot receive new applications.
+  - Client only. Marks a pending/reviewed/shortlisted application as `selected`.
+  - Returns `{ "application": { ... } }`.
+- `POST /api/applications/:applicationId/undo-award`
+  - Client only. Restores a `selected` application to its previous reviewable status before awards are sealed.
+  - Returns `{ "application": { ... } }`.
+- `POST /api/jobs/:jobId/awards/seal`
+  - Client only. Finalizes all selected applications for the job.
+  - Selected applications become `awarded`; remaining reviewable applications become `not_awarded`.
+  - Creates award/not-awarded notifications, opens one chat conversation per awarded professional, writes audit logs, removes the job from professional feeds, and blocks new applications.
+  - Returns `{ "job_id", "awarded_application_ids", "conversation_ids" }`.
+
+## Conversations
+
+- `GET /api/conversations`
+  - Query: `job_id?`
+  - Returns sealed-award chat conversations visible to the caller.
+- `GET /api/conversations/:conversationId/messages`
+  - Returns messages in a visible conversation.
+- `POST /api/conversations/:conversationId/messages`
+  - Body: `{ "body" }`
+  - Sends a message to the other participant and creates an in-app notification.
+- `PATCH /api/conversations/:conversationId/read`
+  - Marks only the caller's received messages in that conversation as read.
+
+## Professional Inquiries
+
+- `GET /api/professional-inquiries`
+  - Lists profile-search inquiry chats for the current client/professional.
+- `POST /api/professional-inquiries`
+  - Client only.
+  - Body: `{ "professional_id", "service_id"?, "message" }`
+  - Opens or reuses an inquiry conversation and sends the first message.
+- `GET /api/professional-inquiries/:inquiryId/messages`
+  - Returns messages in a visible inquiry.
+- `POST /api/professional-inquiries/:inquiryId/messages`
+  - Body: `{ "body" }`
+  - Sends a message to the other inquiry participant.
+- `PATCH /api/professional-inquiries/:inquiryId/read`
+  - Marks only the caller's received messages in that inquiry as read.
+
+## Appointments
+
+- `GET /api/appointments/availability`
+  - Professional: returns the caller's availability slots.
+  - Client/admin: pass `professional_id=<profile-uuid>` to view a professional's open future slots.
+- `POST /api/appointments/availability`
+  - Professional only.
+  - Body: `{ "service_id"?, "starts_at", "ends_at", "note"? }`
+  - Creates an optional appointment slot. A supplied service must belong to the professional.
+  - Open/booked slots cannot overlap another open/booked slot for the same professional.
+- `DELETE /api/appointments/availability/:availabilityId`
+  - Professional only. Removes an owned unbooked availability slot.
+- `GET /api/appointments`
+  - Lists appointment requests visible to the caller.
+  - Clients see their requested bookings; professionals see requests for their slots; admins see all.
+- `POST /api/appointments`
+  - Client only.
+  - Body: `{ "availability_id", "service_id"?, "inquiry_id"?, "note"? }`
+  - Transactionally reserves an open future slot as `requested`, marks the slot `booked`, writes an audit log, and notifies the professional.
+- `PATCH /api/appointments/:appointmentId/status`
+  - Body: `{ "status": "accepted" | "declined" | "cancelled" | "completed" }`
+  - Professionals can accept, decline, or complete. Clients can cancel. Declined/cancelled future slots reopen.
+  - Status changes write audit logs and notify the other participant.
 
 ## Messages
 
@@ -102,7 +177,7 @@ Errors use:
   - Returns messages for the caller with sender, receiver, job, and application context.
 - `POST /api/messages`
   - Body: `{ "receiver_id", "job_id", "application_id"?, "body" }`
-  - Sender and receiver must be valid job participants.
+  - Legacy direct-message route. Sender and receiver must be valid job participants. After awards are sealed, use conversation routes.
 - `PATCH /api/messages/read`
   - Body: `{ "job_id", "sender_id"? }`
   - Marks matching messages received by the caller as read.

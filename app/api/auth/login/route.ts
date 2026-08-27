@@ -1,4 +1,5 @@
 import { fail, ok } from "@/lib/api";
+import { issueAppSession } from "@/lib/session-lock";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { createSupabasePublic } from "@/lib/supabase/public";
 import { z } from "zod";
@@ -36,5 +37,12 @@ export async function POST(request: Request) {
     return fail("Account is inactive", 403);
   }
 
-  return ok({ user: data.user, profile, session: data.session });
+  let appSessionId: string;
+  try {
+    appSessionId = await issueAppSession(adminClient, data.user.id, request);
+  } catch (sessionError) {
+    return fail("Could not create secure app session", 500, sessionError instanceof Error ? sessionError.message : sessionError);
+  }
+
+  return ok({ user: data.user, profile, session: data.session, app_session_id: appSessionId });
 }

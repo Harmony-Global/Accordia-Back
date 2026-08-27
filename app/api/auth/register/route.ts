@@ -1,11 +1,15 @@
 import { created, fail } from "@/lib/api";
+import { recordPasswordLog } from "@/lib/password-log";
+import { issueAppSession } from "@/lib/session-lock";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { createSupabasePublic } from "@/lib/supabase/public";
+import { passwordSchema } from "@/lib/validators";
+import { sendWelcomeMessage } from "@/lib/welcome";
 import { z } from "zod";
 
 const registerSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(8),
+  password: passwordSchema,
   phone: z.string().min(7),
   role: z.enum(["professional", "client"]),
   first_name: z.string().min(1),
@@ -58,6 +62,32 @@ export async function POST(request: Request) {
     }
   }
 
+  await recordPasswordLog({
+    userId: authData.user.id,
+    email: body.data.email,
+    eventType: "password_created",
+    hasPassword: true,
+    request,
+    metadata: { source: "email_registration" }
+  });
+
+  await sendWelcomeMessage({
+    adminClient,
+    userId: authData.user.id,
+    email: body.data.email,
+    firstName: body.data.first_name,
+    role: body.data.role
+  });
+
+  let appSessionId: string | null = null;
+  if (authData.session?.access_token) {
+    try {
+      appSessionId = await issueAppSession(adminClient, authData.user.id, request);
+    } catch (sessionError) {
+      return fail("Could not create secure app session", 500, sessionError instanceof Error ? sessionError.message : sessionError);
+    }
+  }
+
   return created({
     user: {
       id: authData.user.id,
@@ -65,6 +95,7 @@ export async function POST(request: Request) {
       phone: body.data.phone,
       role: body.data.role
     },
-    session: authData.session
+    session: authData.session,
+    app_session_id: appSessionId
   });
 }

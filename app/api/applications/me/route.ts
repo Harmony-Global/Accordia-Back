@@ -10,7 +10,24 @@ export async function GET(request: Request) {
 
   let query = auth.userClient
     .from("applications")
-    .select("*, job:jobs(*, category:categories(*), client:profiles!jobs_client_id_fkey(id, first_name, last_name, phone_verified))")
+    .select(`
+      *,
+      job:jobs(
+        id,
+        title,
+        description,
+        currency,
+        location,
+        state,
+        is_remote,
+        number_of_professionals,
+        status,
+        views_count,
+        applications_count,
+        category:categories(id, name, slug, icon),
+        client:profiles!jobs_client_id_fkey(id, first_name, last_name, phone_verified)
+      )
+    `)
     .eq("professional_id", auth.userId)
     .order("created_at", { ascending: false })
     .limit(50);

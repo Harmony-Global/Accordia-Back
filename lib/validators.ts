@@ -1,5 +1,29 @@
 import { z } from "zod";
 
+export const CONTACT_INFO_MESSAGE = "For safety, keep communication inside Accordia. Do not share phone numbers, email addresses, or external contact links in messages.";
+
+const emailPattern = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
+const phonePattern = /\+?\d[\d\s().-]{7,}\d/g;
+const urlPattern = /\b(?:https?:\/\/|www\.)\S+/i;
+
+function containsContactInfo(value: string) {
+  if (emailPattern.test(value) || urlPattern.test(value)) return true;
+  const candidates = value.match(phonePattern) ?? [];
+  return candidates.some((candidate) => candidate.replace(/\D/g, "").length >= 9);
+}
+
+const safeMessageText = z
+  .string()
+  .min(1)
+  .max(3000)
+  .refine((value) => !containsContactInfo(value), CONTACT_INFO_MESSAGE);
+
+export const passwordSchema = z
+  .string()
+  .min(8, "Password must be at least 8 characters and contain letters and numbers")
+  .regex(/[A-Za-z]/, "Password must contain at least one letter")
+  .regex(/\d/, "Password must contain at least one number");
+
 export const profilePatchSchema = z.object({
   first_name: z.string().min(1).optional(),
   last_name: z.string().min(1).optional(),
@@ -50,6 +74,7 @@ export const createJobSchema = z.object({
   category_id: z.string().uuid(),
   title: z.string().min(5).max(180),
   description: z.string().min(20),
+  number_of_professionals: z.number().int().min(1).max(50).default(1),
   location: z.string().nullable().optional(),
   state: z.string().nullable().optional(),
   is_remote: z.boolean().default(false),
@@ -62,7 +87,8 @@ export const updateJobSchema = createJobSchema.partial().strict();
 export const applySchema = z.object({
   pitch: z.string().min(20).max(3000),
   proposed_rate: z.number().min(0).nullable().optional(),
-  reference_image_urls: z.array(z.string().max(1_500_000)).max(3).optional()
+  estimated_days: z.number().int().min(1).max(365).nullable().optional(),
+  reference_image_urls: z.array(z.string().max(1_500_000)).min(1, "You need to attach supporting images for your application").max(3)
 });
 
 export const applicationPatchSchema = applySchema.partial().strict();
@@ -75,8 +101,59 @@ export const messageSchema = z.object({
   receiver_id: z.string().uuid(),
   job_id: z.string().uuid(),
   application_id: z.string().uuid().nullable().optional(),
-  body: z.string().min(1).max(3000)
+  body: safeMessageText
 });
+
+export const conversationMessageSchema = z.object({
+  body: safeMessageText
+});
+
+export const revisionRequestSchema = z.object({
+  note: z.string().min(10).max(2000)
+}).strict();
+
+export const conversationReviewSchema = z.object({
+  rating: z.number().int().min(1).max(5).nullable().optional(),
+  review_text: z.string().max(2000).nullable().optional(),
+  skipped: z.boolean().default(false)
+}).strict().refine((data) => data.skipped || typeof data.rating === "number", {
+  message: "Rating is required unless the review is skipped",
+  path: ["rating"]
+});
+
+export const professionalInquirySchema = z.object({
+  professional_id: z.string().uuid(),
+  service_id: z.string().uuid().nullable().optional(),
+  message: safeMessageText
+});
+
+export const availabilityCreateSchema = z.object({
+  service_id: z.string().uuid().nullable().optional(),
+  starts_at: z.string().datetime(),
+  ends_at: z.string().datetime(),
+  note: z.string().max(1000).nullable().optional()
+});
+
+export const appointmentCreateSchema = z.object({
+  availability_id: z.string().uuid(),
+  service_id: z.string().uuid().nullable().optional(),
+  inquiry_id: z.string().uuid().nullable().optional(),
+  note: z.string().max(1000).nullable().optional()
+});
+
+export const appointmentStatusSchema = z.object({
+  status: z.enum(["accepted", "declined", "cancelled", "completed"])
+});
+
+export const appointmentRescheduleCreateSchema = z.object({
+  starts_at: z.string().datetime(),
+  ends_at: z.string().datetime(),
+  note: z.string().max(1000).nullable().optional()
+}).strict();
+
+export const appointmentRescheduleResponseSchema = z.object({
+  status: z.enum(["accepted", "declined"])
+}).strict();
 
 export const markMessagesReadSchema = z.object({
   job_id: z.string().uuid(),
@@ -84,7 +161,7 @@ export const markMessagesReadSchema = z.object({
 });
 
 export const progressSchema = z.object({
-  status: z.enum(["in_progress", "in_review", "delivered", "closed", "cancelled"]),
+  status: z.enum(["in_progress", "in_review", "delivered", "completed", "closed", "cancelled"]),
   note: z.string().max(2000).nullable().optional()
 });
 

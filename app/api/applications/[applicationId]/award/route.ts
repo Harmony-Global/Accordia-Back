@@ -16,6 +16,6 @@ export async function POST(request: Request, { params }: Params) {
     p_agreed_amount: body.data.agreed_amount ?? null
   });
 
-  if (error) return fail("Could not award job", 400, error.message);
-  return ok({ job_id: data });
+  if (error) return fail("Could not select application", 400, error.message);
+  return ok({ application: data });
 }

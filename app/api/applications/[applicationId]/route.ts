@@ -14,6 +14,7 @@ export async function PATCH(request: Request, { params }: Params) {
   const update: Record<string, unknown> = {};
   if (body.data.pitch !== undefined) update.pitch = body.data.pitch;
   if (body.data.proposed_rate !== undefined) update.proposed_rate = body.data.proposed_rate;
+  if (body.data.estimated_days !== undefined) update.estimated_days = body.data.estimated_days;
   if (body.data.reference_image_urls !== undefined) update.reference_image_urls = body.data.reference_image_urls;
 
   const { data, error } = await auth.adminClient
