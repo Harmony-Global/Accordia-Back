@@ -27,7 +27,7 @@ export async function GET(request: Request) {
     .from("jobs")
     .select("*, categories(*), client:profiles!jobs_client_id_fkey(id, first_name, last_name, phone_verified)")
     .in("category_id", categoryIds)
-    .eq("status", "open")
+    .in("status", ["open", "in_discussion", "awarded", "in_progress", "in_review", "delivered", "completed", "closed"])
     .order("created_at", { ascending: false })
     .limit(50);
 
