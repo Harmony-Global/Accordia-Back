@@ -8,11 +8,15 @@ type ConversationJob = {
   title?: string | null;
   is_remote?: boolean | null;
   number_of_professionals?: number | null;
+  price_type?: string | null;
+  price_amount?: number | string | null;
 } | {
   id: string;
   title?: string | null;
   is_remote?: boolean | null;
   number_of_professionals?: number | null;
+  price_type?: string | null;
+  price_amount?: number | string | null;
 }[] | null;
 
 function normalizeJob(job: ConversationJob) {
@@ -25,7 +29,7 @@ export async function POST(request: Request, { params }: Params) {
 
   const { data: conversation, error: conversationError } = await auth.adminClient
     .from("job_conversations")
-    .select("*, job:jobs(id, title, is_remote, number_of_professionals), application:applications(*)")
+    .select("*, job:jobs(id, title, is_remote, number_of_professionals, price_type, price_amount), application:applications(*)")
     .eq("id", params.conversationId)
     .single();
 
@@ -35,6 +39,18 @@ export async function POST(request: Request, { params }: Params) {
 
   const wasAlreadyPaid = Boolean(conversation.upfront_payment_made_at);
   const job = normalizeJob(conversation.job as ConversationJob);
+
+  if (!wasAlreadyPaid) {
+    const { data: acceptedQuote, error: quoteError } = await auth.adminClient
+      .from("job_quotes")
+      .select("id")
+      .eq("conversation_id", conversation.id)
+      .eq("status", "accepted")
+      .maybeSingle();
+
+    if (quoteError) return fail("Could not verify quote status", 400, quoteError.message);
+    if (!acceptedQuote) return fail("A quote must be accepted before hiring or upfront payment.", 409);
+  }
 
   if (!wasAlreadyPaid) {
     const professionalCap = Math.max(1, Number(job?.number_of_professionals ?? 1));

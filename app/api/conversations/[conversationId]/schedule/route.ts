@@ -1,13 +1,13 @@
 import { created, fail } from "@/lib/api";
 import { conversationSelect, normalizeRelation } from "@/lib/conversations";
-import { requireRole } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { conversationScheduleSchema } from "@/lib/validators";
 
 type Params = { params: { conversationId: string } };
-type ConversationJob = { title?: string | null } | { title?: string | null }[] | null;
+type ConversationJob = { title?: string | null; status?: string | null } | { title?: string | null; status?: string | null }[] | null;
 
 export async function POST(request: Request, { params }: Params) {
-  const auth = await requireRole(request, ["professional"]);
+  const auth = await requireUser(request);
   if (auth instanceof Response) return auth;
 
   const body = conversationScheduleSchema.safeParse(await request.json());
@@ -20,13 +20,17 @@ export async function POST(request: Request, { params }: Params) {
 
   const { data: conversation, error: conversationError } = await auth.adminClient
     .from("job_conversations")
-    .select("*, job:jobs(id, title)")
+    .select("*, job:jobs(id, title, status)")
     .eq("id", params.conversationId)
     .single();
 
   if (conversationError || !conversation) return fail("Conversation not found", 404, conversationError?.message);
-  if (conversation.professional_id !== auth.userId) return fail("Only the professional can set the work schedule", 403);
+  const isClient = conversation.client_id === auth.userId;
+  const isProfessional = conversation.professional_id === auth.userId;
+  if (!isClient && !isProfessional) return fail("Forbidden for this conversation", 403);
   if (conversation.status !== "open") return fail("This conversation is not open", 409);
+  const job = normalizeRelation(conversation.job as ConversationJob);
+  if (job?.status === "closed" || job?.status === "cancelled") return fail("This job request is closed", 409);
 
   const { data: updatedConversation, error: updateError } = await auth.adminClient
     .from("job_conversations")
@@ -41,12 +45,13 @@ export async function POST(request: Request, { params }: Params) {
   if (updateError || !updatedConversation) return fail("Could not save work schedule", 400, updateError?.message);
 
   const messageBody = `Work schedule set: ${startsAt.toLocaleString()} - ${endsAt.toLocaleString()}.`;
+  const receiverId = isClient ? conversation.professional_id : conversation.client_id;
   const { data: message, error: messageError } = await auth.adminClient
     .from("messages")
     .insert({
       conversation_id: conversation.id,
-      sender_id: conversation.professional_id,
-      receiver_id: conversation.client_id,
+      sender_id: auth.userId,
+      receiver_id: receiverId,
       job_id: conversation.job_id,
       application_id: conversation.application_id,
       body: messageBody
@@ -56,12 +61,11 @@ export async function POST(request: Request, { params }: Params) {
 
   if (messageError) return fail("Schedule saved, but chat notice could not be sent", 400, messageError.message);
 
-  const job = normalizeRelation(conversation.job as ConversationJob);
   await auth.adminClient.from("notifications").insert({
-    user_id: conversation.client_id,
+    user_id: receiverId,
     type: "job_schedule_set",
     title: "Work schedule set",
-    body: `The professional set a work schedule${job?.title ? ` for "${job.title}"` : ""}.`,
+    body: `${isClient ? "The client" : "The professional"} set a work schedule${job?.title ? ` for "${job.title}"` : ""}.`,
     data: {
       conversation_id: conversation.id,
       job_id: conversation.job_id,

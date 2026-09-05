@@ -75,6 +75,8 @@ export const createJobSchema = z.object({
   title: z.string().min(5).max(180),
   description: z.string().min(20),
   number_of_professionals: z.number().int().min(1).max(50).default(1),
+  price_type: z.enum(["fixed", "negotiable"]).default("negotiable"),
+  price_amount: z.number().min(0),
   location: z.string().nullable().optional(),
   state: z.string().nullable().optional(),
   is_remote: z.boolean().default(false),
@@ -121,6 +123,22 @@ export const conversationMessageSchema = z.object({
 export const conversationScheduleSchema = z.object({
   starts_at: z.string().datetime(),
   ends_at: z.string().datetime()
+}).strict();
+
+export const jobQuoteSchema = z.object({
+  project_title: z.string().min(3).max(180),
+  project_description: z.string().min(10).max(5000),
+  total_budget: z.number().min(0),
+  duration_days: z.number().int().min(1).max(365),
+  attachments: z.array(z.object({
+    name: z.string().min(1).max(255),
+    type: z.string().max(120).nullable().optional(),
+    size: z.number().int().min(0).max(10_485_760).nullable().optional()
+  })).max(5).default([])
+}).strict();
+
+export const quoteReviewSchema = z.object({
+  note: z.string().min(3).max(2000)
 }).strict();
 
 export const revisionRequestSchema = z.object({

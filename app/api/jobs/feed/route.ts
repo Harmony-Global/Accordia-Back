@@ -35,5 +35,18 @@ export async function GET(request: Request) {
 
   const { data, error } = await query;
   if (error) return fail("Could not load job feed", 400, error.message);
-  return ok({ jobs: data });
+
+  const jobIds = (data ?? []).map((job) => job.id);
+  if (jobIds.length === 0) return ok({ jobs: [] });
+
+  const { data: existingApplications, error: applicationsError } = await auth.adminClient
+    .from("applications")
+    .select("job_id")
+    .eq("professional_id", auth.userId)
+    .in("job_id", jobIds);
+
+  if (applicationsError) return fail("Could not filter matched jobs", 400, applicationsError.message);
+
+  const appliedJobIds = new Set((existingApplications ?? []).map((application) => application.job_id));
+  return ok({ jobs: (data ?? []).filter((job) => !appliedJobIds.has(job.id)) });
 }

@@ -23,6 +23,7 @@ export async function PATCH(request: Request, { params }: Params) {
     .update(update)
     .eq("id", params.applicationId)
     .eq("professional_id", auth.userId)
+    .is("deleted_at", null)
     .in("status", ["pending", "reviewed", "shortlisted"])
     .select("*, job:jobs(*, category:categories(*), client:profiles!jobs_client_id_fkey(id, first_name, last_name, phone_verified))")
     .single();
@@ -35,24 +36,14 @@ export async function DELETE(request: Request, { params }: Params) {
   const auth = await requireRole(request, ["professional"]);
   if (auth instanceof Response) return auth;
 
-  const { data: application, error: loadError } = await auth.adminClient
-    .from("applications")
-    .select("id, professional_id, status, proposal_attachments")
-    .eq("id", params.applicationId)
-    .single();
+  const { data, error } = await auth.userClient.rpc("soft_delete_application", {
+    p_application_id: params.applicationId
+  });
 
-  if (loadError || !application) return fail("Application not found", 404, loadError?.message);
-  if (application.professional_id !== auth.userId) return fail("Forbidden for this application", 403);
-  if (!["withdrawn", "rejected", "not_awarded"].includes(application.status)) {
-    return fail("Only inactive applications can be deleted. Withdraw the application first.", 409);
+  if (error) {
+    const status = error.message.includes("Only inactive applications") ? 409 : error.message.includes("not found") ? 404 : 400;
+    return fail("Could not delete application", status, error.message);
   }
 
-  const { error } = await auth.adminClient
-    .from("applications")
-    .delete()
-    .eq("id", params.applicationId)
-    .eq("professional_id", auth.userId);
-
-  if (error) return fail("Could not delete application", 400, error.message);
-  return ok({ application_id: params.applicationId });
+  return ok(data);
 }
