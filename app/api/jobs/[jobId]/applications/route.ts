@@ -40,6 +40,7 @@ export async function GET(request: Request, { params }: Params) {
       )
     `)
     .eq("job_id", params.jobId)
+    .is("deleted_at", null)
     .order("created_at", { ascending: false });
 
   if (error) return fail("Could not load applications", 400, error.message);

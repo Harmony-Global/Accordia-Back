@@ -29,6 +29,7 @@ export async function GET(request: Request) {
       )
     `)
     .eq("professional_id", auth.userId)
+    .is("deleted_at", null)
     .order("created_at", { ascending: false })
     .limit(50);
 

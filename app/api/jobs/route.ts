@@ -23,6 +23,7 @@ export async function GET(request: Request) {
         status,
         chat_invited_at,
         proposed_rate,
+        deleted_at,
         created_at,
         updated_at,
         professional:profiles!applications_professional_id_fkey(
@@ -69,8 +70,13 @@ export async function GET(request: Request) {
   const { data, error } = await query;
   if (error) return fail("Could not load jobs", 400, error.message);
 
-  if (mine && data?.length) {
-    const jobIds = data.map((job) => job.id);
+  const jobs = (data ?? []).map((job) => ({
+    ...job,
+    applications: (job.applications ?? []).filter((application: { deleted_at?: string | null }) => !application.deleted_at)
+  }));
+
+  if (mine && jobs.length) {
+    const jobIds = jobs.map((job) => job.id);
     const { data: rejectedApplications, error: rejectedApplicationsError } = await auth.adminClient
       .from("applications")
       .select(`
@@ -80,6 +86,7 @@ export async function GET(request: Request) {
         status,
         chat_invited_at,
         proposed_rate,
+        deleted_at,
         created_at,
         updated_at,
         professional:profiles!applications_professional_id_fkey(
@@ -118,6 +125,7 @@ export async function GET(request: Request) {
       `)
       .in("job_id", jobIds)
       .in("status", ["rejected", "not_awarded"])
+      .is("deleted_at", null)
       .order("updated_at", { ascending: false });
 
     if (rejectedApplicationsError) return fail("Could not load rejected applications", 400, rejectedApplicationsError.message);
@@ -128,14 +136,14 @@ export async function GET(request: Request) {
     }
 
     return ok({
-      jobs: data.map((job) => ({
+      jobs: jobs.map((job) => ({
         ...job,
         rejected_applications: rejectedByJob.get(job.id) ?? []
       }))
     });
   }
 
-  return ok({ jobs: data });
+  return ok({ jobs });
 }
 
 export async function POST(request: Request) {

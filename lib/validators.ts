@@ -75,6 +75,8 @@ export const createJobSchema = z.object({
   title: z.string().min(5).max(180),
   description: z.string().min(20),
   number_of_professionals: z.number().int().min(1).max(50).default(1),
+  price_type: z.enum(["fixed", "negotiable"]).default("negotiable"),
+  price_amount: z.number().min(0),
   location: z.string().nullable().optional(),
   state: z.string().nullable().optional(),
   is_remote: z.boolean().default(false),
@@ -88,10 +90,20 @@ export const applySchema = z.object({
   pitch: z.string().min(20).max(3000),
   proposed_rate: z.number().min(0).nullable().optional(),
   estimated_days: z.number().int().min(1).max(365).nullable().optional(),
-  reference_image_urls: z.array(z.string().max(1_500_000)).min(1, "You need to attach supporting images for your application").max(3)
+  proposed_start_at: z.string().datetime().nullable().optional(),
+  reference_image_urls: z.array(z.string().max(1_500_000)).max(3).default([])
 });
 
 export const applicationPatchSchema = applySchema.partial().strict();
+
+export const proposalDraftSchema = z.object({
+  job_id: z.string().uuid(),
+  pitch: z.string().max(3000).nullable().optional(),
+  proposed_rate: z.number().min(0).nullable().optional(),
+  estimated_days: z.number().int().min(1).max(365).nullable().optional(),
+  proposed_start_at: z.string().datetime().nullable().optional(),
+  reference_image_urls: z.array(z.string().max(1_500_000)).max(3).optional()
+}).strict();
 
 export const awardSchema = z.object({
   agreed_amount: z.number().min(0).nullable().optional()
@@ -107,6 +119,27 @@ export const messageSchema = z.object({
 export const conversationMessageSchema = z.object({
   body: safeMessageText
 });
+
+export const conversationScheduleSchema = z.object({
+  starts_at: z.string().datetime(),
+  ends_at: z.string().datetime()
+}).strict();
+
+export const jobQuoteSchema = z.object({
+  project_title: z.string().min(3).max(180),
+  project_description: z.string().min(10).max(5000),
+  total_budget: z.number().min(0),
+  duration_days: z.number().int().min(1).max(365),
+  attachments: z.array(z.object({
+    name: z.string().min(1).max(255),
+    type: z.string().max(120).nullable().optional(),
+    size: z.number().int().min(0).max(10_485_760).nullable().optional()
+  })).max(5).default([])
+}).strict();
+
+export const quoteReviewSchema = z.object({
+  note: z.string().min(3).max(2000)
+}).strict();
 
 export const revisionRequestSchema = z.object({
   note: z.string().min(10).max(2000)
