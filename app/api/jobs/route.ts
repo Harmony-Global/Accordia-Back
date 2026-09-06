@@ -25,40 +25,7 @@ export async function GET(request: Request) {
         proposed_rate,
         deleted_at,
         created_at,
-        updated_at,
-        professional:profiles!applications_professional_id_fkey(
-          id,
-          first_name,
-          last_name,
-          phone_verified,
-          avatar_url,
-          professional_profiles(
-            id,
-            user_id,
-            bio,
-            years_experience,
-            location,
-            state,
-            is_available,
-            professional_categories(category:categories(id, name, slug, icon)),
-            professional_services(
-              id,
-              professional_id,
-              category_id,
-              offering_type,
-              title,
-              description,
-              image_url,
-              price_min,
-              price_max,
-              currency,
-              is_active,
-              created_at,
-              updated_at,
-              category:categories(id, name, slug, icon)
-            )
-          )
-        )
+        updated_at
       )
     `)
     .order("created_at", { ascending: false })
@@ -88,40 +55,7 @@ export async function GET(request: Request) {
         proposed_rate,
         deleted_at,
         created_at,
-        updated_at,
-        professional:profiles!applications_professional_id_fkey(
-          id,
-          first_name,
-          last_name,
-          phone_verified,
-          avatar_url,
-          professional_profiles(
-            id,
-            user_id,
-            bio,
-            years_experience,
-            location,
-            state,
-            is_available,
-            professional_categories(category:categories(id, name, slug, icon)),
-            professional_services(
-              id,
-              professional_id,
-              category_id,
-              offering_type,
-              title,
-              description,
-              image_url,
-              price_min,
-              price_max,
-              currency,
-              is_active,
-              created_at,
-              updated_at,
-              category:categories(id, name, slug, icon)
-            )
-          )
-        )
+        updated_at
       `)
       .in("job_id", jobIds)
       .in("status", ["rejected", "not_awarded"])

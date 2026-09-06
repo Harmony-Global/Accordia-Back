@@ -1,6 +1,7 @@
 import { fail, ok } from "@/lib/api";
 import { issueAppSession } from "@/lib/session-lock";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
+import { normalizeAvatarUrl } from "@/lib/validators";
 import { sendWelcomeMessage } from "@/lib/welcome";
 import { z } from "zod";
 
@@ -58,7 +59,7 @@ export async function POST(request: Request) {
         email,
         first_name: null,
         last_name: null,
-        avatar_url: typeof userData.user.user_metadata?.avatar_url === "string" ? userData.user.user_metadata.avatar_url : null
+        avatar_url: normalizeAvatarUrl(userData.user.user_metadata?.avatar_url)
       }
     });
   }
@@ -83,7 +84,7 @@ export async function POST(request: Request) {
         email,
         first_name: firstName || null,
         last_name: lastName || null,
-        avatar_url: typeof metadata.avatar_url === "string" ? metadata.avatar_url : null
+        avatar_url: normalizeAvatarUrl(metadata.avatar_url)
       }
     });
   }
@@ -95,7 +96,7 @@ export async function POST(request: Request) {
     role: body.data.role,
     first_name: firstName,
     last_name: lastName,
-    avatar_url: typeof metadata.avatar_url === "string" ? metadata.avatar_url : null,
+    avatar_url: normalizeAvatarUrl(metadata.avatar_url),
     phone_verified: false
   });
 
