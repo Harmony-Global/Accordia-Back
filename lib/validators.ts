@@ -12,6 +12,22 @@ function containsContactInfo(value: string) {
   return candidates.some((candidate) => candidate.replace(/\D/g, "").length >= 9);
 }
 
+function isHttpUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+export function normalizeAvatarUrl(value: unknown) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > 2048 || /^data:image\//i.test(trimmed) || !isHttpUrl(trimmed)) return null;
+  return trimmed;
+}
+
 const safeMessageText = z
   .string()
   .min(1)
@@ -28,7 +44,7 @@ export const profilePatchSchema = z.object({
   first_name: z.string().min(1).optional(),
   last_name: z.string().min(1).optional(),
   phone: z.string().min(7).optional(),
-  avatar_url: z.string().url().nullable().optional()
+  avatar_url: z.string().trim().max(2048).refine((value) => normalizeAvatarUrl(value) === value, "Avatar must be an http(s) image URL, not inline image data").nullable().optional()
 }).strict();
 
 export const professionalProfilePatchSchema = z.object({

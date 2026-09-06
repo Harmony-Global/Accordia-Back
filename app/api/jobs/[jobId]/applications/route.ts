@@ -34,8 +34,7 @@ export async function GET(request: Request, { params }: Params) {
           location,
           state,
           is_available,
-          professional_categories(category:categories(id, name, slug, icon)),
-          professional_services(id, professional_id, category_id, offering_type, title, description, image_url, price_min, price_max, currency, is_active, created_at, updated_at, category:categories(id, name, slug, icon))
+          professional_categories(category:categories(id, name, slug, icon))
         )
       )
     `)

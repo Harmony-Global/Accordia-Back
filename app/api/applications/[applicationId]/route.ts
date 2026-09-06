@@ -1,8 +1,66 @@
 import { fail, ok } from "@/lib/api";
-import { requireRole } from "@/lib/auth";
+import { requireRole, requireUser } from "@/lib/auth";
 import { applicationPatchSchema } from "@/lib/validators";
 
 type Params = { params: { applicationId: string } };
+
+export async function GET(request: Request, { params }: Params) {
+  const auth = await requireUser(request);
+  if (auth instanceof Response) return auth;
+
+  const { data: application, error } = await auth.adminClient
+    .from("applications")
+    .select(`
+      *,
+      job:jobs(
+        id,
+        client_id,
+        title,
+        description,
+        currency,
+        location,
+        state,
+        is_remote,
+        number_of_professionals,
+        status,
+        views_count,
+        applications_count,
+        price_type,
+        price_amount,
+        category:categories(id, name, slug, icon),
+        client:profiles!jobs_client_id_fkey(id, first_name, last_name, phone_verified)
+      ),
+      professional:profiles!applications_professional_id_fkey(
+        id,
+        first_name,
+        last_name,
+        phone_verified,
+        avatar_url,
+        professional_profiles(
+          id,
+          user_id,
+          bio,
+          years_experience,
+          location,
+          state,
+          is_available,
+          professional_categories(category:categories(id, name, slug, icon)),
+          professional_services(id, professional_id, category_id, offering_type, title, description, image_url, price_min, price_max, currency, is_active, created_at, updated_at, category:categories(id, name, slug, icon))
+        )
+      )
+    `)
+    .eq("id", params.applicationId)
+    .is("deleted_at", null)
+    .single();
+
+  if (error || !application) return fail("Application not found", 404, error?.message);
+
+  const ownsJob = application.job?.client_id === auth.userId;
+  const ownsApplication = application.professional_id === auth.userId;
+  if (auth.role !== "admin" && !ownsJob && !ownsApplication) return fail("Forbidden for this application", 403);
+
+  return ok({ application });
+}
 
 export async function PATCH(request: Request, { params }: Params) {
   const auth = await requireRole(request, ["professional"]);
