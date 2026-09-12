@@ -25,6 +25,13 @@ function filterInactiveOfferings(conversation: ConversationPayload) {
   return conversation;
 }
 
+function attachUnreadCounts<T extends { id?: string | null }>(conversations: T[], unreadCounts: Map<string, number>) {
+  return conversations.map((conversation) => ({
+    ...conversation,
+    unread_message_count: conversation.id ? unreadCounts.get(conversation.id) ?? 0 : 0
+  }));
+}
+
 export async function GET(request: Request) {
   const auth = await requireUser(request);
   if (auth instanceof Response) return auth;
@@ -47,5 +54,25 @@ export async function GET(request: Request) {
   const { data, error } = await query;
   if (error) return fail("Could not load conversations", 400, error.message);
 
-  return ok({ conversations: (data ?? []).map((conversation) => filterInactiveOfferings(conversation as ConversationPayload)) });
+  const conversations = (data ?? []).map((conversation) => filterInactiveOfferings(conversation as ConversationPayload));
+  const conversationIds = conversations.map((conversation) => (conversation as { id?: string }).id).filter(Boolean) as string[];
+  const unreadCounts = new Map<string, number>();
+
+  if (conversationIds.length > 0) {
+    const { data: unreadMessages, error: unreadError } = await auth.adminClient
+      .from("messages")
+      .select("conversation_id")
+      .in("conversation_id", conversationIds)
+      .eq("receiver_id", auth.userId)
+      .eq("is_read", false);
+
+    if (unreadError) return fail("Could not load conversation unread counts", 400, unreadError.message);
+
+    for (const message of unreadMessages ?? []) {
+      if (!message.conversation_id) continue;
+      unreadCounts.set(message.conversation_id, (unreadCounts.get(message.conversation_id) ?? 0) + 1);
+    }
+  }
+
+  return ok({ conversations: attachUnreadCounts(conversations as Array<ConversationPayload & { id?: string }>, unreadCounts) });
 }
