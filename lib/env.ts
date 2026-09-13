@@ -19,6 +19,9 @@ export const env = {
   supabaseServiceRoleKey: readEnv("SUPABASE_SERVICE_ROLE_KEY"),
   appFrontendUrl: readOptionalEnv("APP_FRONTEND_URL"),
   passwordResetRedirectUrl: readOptionalEnv("PASSWORD_RESET_REDIRECT_URL"),
+  paystackSecretKey: readOptionalEnv("PAYSTACK_SECRET_KEY"),
+  paystackBaseUrl: readOptionalEnv("PAYSTACK_BASE_URL") ?? "https://api.paystack.co",
+  paystackCurrency: readOptionalEnv("PAYSTACK_CURRENCY") ?? "NGN",
   resendApiKey: readOptionalEnv("RESEND_API_KEY"),
   resendFromEmail: readOptionalEnv("RESEND_FROM_EMAIL")
 };

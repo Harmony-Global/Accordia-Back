@@ -1,6 +1,8 @@
 import { fail, ok } from "@/lib/api";
 import { conversationSelect } from "@/lib/conversations";
 import { requireUser } from "@/lib/auth";
+import { isPaystackConfigured } from "@/lib/paystack";
+import { initializeJobPayment, paymentFailure } from "@/lib/payments";
 
 type Params = { params: { conversationId: string } };
 type ConversationJob = {
@@ -63,6 +65,15 @@ export async function POST(request: Request, { params }: Params) {
     if (countError) return fail("Could not verify hiring capacity", 400, countError.message);
     if ((count ?? 0) >= professionalCap) {
       return fail(`This request already has the required ${professionalCap} hired professional${professionalCap === 1 ? "" : "s"}.`, 409);
+    }
+  }
+
+  if (!wasAlreadyPaid && isPaystackConfigured()) {
+    try {
+      const payment = await initializeJobPayment(auth, request, conversation.id, "job_upfront");
+      return ok({ payment }, { status: 202 });
+    } catch (error) {
+      return paymentFailure(error);
     }
   }
 
