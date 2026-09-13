@@ -563,6 +563,10 @@ export async function applyPaystackPaymentData(adminClient: AdminClient, referen
 
   if (updateError || !updatedPayment) throw new PaymentFlowError("Could not update payment status", 400, updateError?.message);
 
-  const conversation = status === "success" ? await settleSuccessfulPayment(adminClient, updatedPayment) : null;
-  return { payment: updatedPayment, conversation };
+  const settledResource = status === "success" ? await settleSuccessfulPayment(adminClient, updatedPayment) : null;
+  if (updatedPayment.payment_type === "appointment_full") {
+    return { payment: updatedPayment, appointment: settledResource };
+  }
+
+  return { payment: updatedPayment, conversation: settledResource };
 }

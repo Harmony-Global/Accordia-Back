@@ -24,9 +24,11 @@ export async function PATCH(request: Request, { params }: Params) {
 
   if (currentError || !currentService) return fail("Professional service not found", 404, currentError?.message);
 
-  const priceMin = body.data.price_min ?? currentService.price_min;
-  const priceMax = body.data.price_max ?? currentService.price_max;
+  const fixedPrice = body.data.price_min ?? body.data.price_max;
+  const priceMin = fixedPrice ?? currentService.price_min;
+  const priceMax = fixedPrice ?? currentService.price_max;
   if (priceMax < priceMin) return fail("Maximum price must be greater than or equal to minimum price", 422);
+  if (priceMax !== priceMin) return fail("Professional services must use one fixed price", 422);
 
   if (body.data.category_id) {
     const { data: professionalProfile, error: profileError } = await auth.adminClient
@@ -51,7 +53,13 @@ export async function PATCH(request: Request, { params }: Params) {
 
   const { data: service, error } = await auth.adminClient
     .from("professional_services")
-    .update(body.data)
+    .update(
+      body.data.price_min !== undefined
+        ? { ...body.data, price_max: body.data.price_min }
+        : body.data.price_max !== undefined
+          ? { ...body.data, price_min: body.data.price_max }
+          : body.data
+    )
     .eq("id", params.serviceId)
     .eq("professional_id", auth.userId)
     .select("*, category:categories(*)")
