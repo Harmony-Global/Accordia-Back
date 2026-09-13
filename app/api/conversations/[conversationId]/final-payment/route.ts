@@ -1,6 +1,8 @@
 import { fail, ok } from "@/lib/api";
 import { conversationSelect, normalizeRelation } from "@/lib/conversations";
 import { requireRole } from "@/lib/auth";
+import { isPaystackConfigured } from "@/lib/paystack";
+import { initializeJobPayment, paymentFailure } from "@/lib/payments";
 
 type Params = { params: { conversationId: string } };
 type ConversationJob = { title?: string | null } | { title?: string | null }[] | null;
@@ -24,6 +26,15 @@ export async function POST(request: Request, { params }: Params) {
   }
 
   const wasAlreadyPaid = Boolean(conversation.final_payment_made_at);
+
+  if (!wasAlreadyPaid && isPaystackConfigured()) {
+    try {
+      const payment = await initializeJobPayment(auth, request, conversation.id, "job_final");
+      return ok({ payment }, { status: 202 });
+    } catch (error) {
+      return paymentFailure(error);
+    }
+  }
 
   if (!wasAlreadyPaid) {
     const { error: paymentError } = await auth.adminClient
