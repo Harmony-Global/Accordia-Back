@@ -25,6 +25,7 @@ type PaymentRecord = {
   amount: number | string;
   currency: string;
   provider_reference: string;
+  receipt_number?: string | null;
   status: string;
 };
 
@@ -66,6 +67,36 @@ type AcceptedQuote = {
     currency?: string | null;
   } | {
     currency?: string | null;
+  }[] | null;
+};
+
+type AppointmentPaymentPayload = {
+  id: string;
+  client_id: string;
+  professional_id: string;
+  service_id: string | null;
+  status: string;
+  payment_made_at?: string | null;
+  payment_reference?: string | null;
+  service?: {
+    id: string;
+    title?: string | null;
+    price_min?: number | string | null;
+    price_max?: number | string | null;
+    currency?: string | null;
+  } | {
+    id: string;
+    title?: string | null;
+    price_min?: number | string | null;
+    price_max?: number | string | null;
+    currency?: string | null;
+  }[] | null;
+  client?: {
+    id: string;
+    email?: string | null;
+  } | {
+    id: string;
+    email?: string | null;
   }[] | null;
 };
 
@@ -118,6 +149,11 @@ function paymentStatusFromPaystack(status: string | undefined) {
   if (status === "abandoned") return "abandoned";
   if (status === "failed" || status === "reversed") return "failed";
   return "pending";
+}
+
+function createReceiptNumber(paymentId: string) {
+  const date = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  return `ACC-RCPT-${date}-${paymentId.slice(0, 8).toUpperCase()}`;
 }
 
 async function loadAcceptedQuote(adminClient: AdminClient, conversationId: string) {
@@ -246,7 +282,148 @@ export async function initializeJobPayment(auth: AuthContext, request: Request, 
   }
 }
 
+export async function initializeAppointmentPayment(auth: AuthContext, request: Request, appointmentId: string) {
+  const { data: appointment, error: appointmentError } = await auth.adminClient
+    .from("appointments")
+    .select("id, client_id, professional_id, service_id, status, payment_made_at, service:professional_services(id, title, price_min, price_max, currency), client:profiles!appointments_client_id_fkey(id, email)")
+    .eq("id", appointmentId)
+    .single<AppointmentPaymentPayload>();
+
+  if (appointmentError || !appointment) throw new PaymentFlowError("Appointment not found", 404, appointmentError?.message);
+  if (appointment.client_id !== auth.userId) throw new PaymentFlowError("Only the client can pay for this appointment", 403);
+  if (appointment.payment_made_at) throw new PaymentFlowError("This appointment has already been paid", 409);
+  if (["cancelled", "declined"].includes(appointment.status)) {
+    throw new PaymentFlowError("Cancelled or declined appointments cannot be paid", 409);
+  }
+
+  const service = normalizeRelation(appointment.service);
+  if (!service) throw new PaymentFlowError("This appointment must be linked to a priced service before payment can continue", 409);
+
+  const priceMin = Number(service.price_min);
+  const priceMax = Number(service.price_max);
+  if (!Number.isFinite(priceMin) || priceMin <= 0) throw new PaymentFlowError("This service does not have a valid appointment price", 409);
+  if (Number.isFinite(priceMax) && priceMax !== priceMin) {
+    throw new PaymentFlowError("This service needs one fixed price before appointment payment can continue", 409);
+  }
+
+  const client = normalizeRelation(appointment.client);
+  const email = client?.email;
+  if (!email) throw new PaymentFlowError("Client email is required before payment can continue", 409);
+
+  const amount = normalizePaymentAmount(priceMin);
+  const currency = (service.currency ?? env.paystackCurrency).toUpperCase();
+  const reference = createPaystackReference("APPOINTMENT");
+  const callbackUrl = buildPaymentCallbackUrl(request, reference);
+  const metadata = {
+    appointment_id: appointment.id,
+    payment_type: "appointment_full",
+    professional_id: appointment.professional_id,
+    service_id: appointment.service_id
+  };
+
+  const { data: payment, error: insertError } = await auth.adminClient
+    .from("payments")
+    .insert({
+      amount,
+      appointment_id: appointment.id,
+      currency,
+      metadata,
+      payer_id: auth.userId,
+      payment_type: "appointment_full",
+      professional_id: appointment.professional_id,
+      provider: "paystack",
+      provider_reference: reference,
+      status: "initialized"
+    })
+    .select("id, payment_type, amount, currency, provider_reference, status")
+    .single<PaymentRecord>();
+
+  if (insertError || !payment) throw new PaymentFlowError("Could not prepare appointment payment", 400, insertError?.message);
+
+  try {
+    const paystack = await initializePaystackTransaction({
+      amount,
+      callbackUrl,
+      currency,
+      email,
+      metadata,
+      reference
+    });
+
+    const { data: updatedPayment, error: updateError } = await auth.adminClient
+      .from("payments")
+      .update({
+        access_code: paystack.access_code,
+        authorization_url: paystack.authorization_url,
+        raw_response: { initialize: paystack }
+      })
+      .eq("id", payment.id)
+      .select("id, payment_type, amount, currency, provider_reference, authorization_url, access_code, status")
+      .single<PaymentInitialization>();
+
+    if (updateError || !updatedPayment) throw new PaymentFlowError("Could not save Paystack payment details", 400, updateError?.message);
+    return updatedPayment;
+  } catch (error) {
+    await auth.adminClient
+      .from("payments")
+      .update({ status: "failed", raw_response: { initialize_error: error instanceof Error ? error.message : "Paystack initialization failed" } })
+      .eq("id", payment.id);
+    throw error;
+  }
+}
+
 export async function settleSuccessfulPayment(adminClient: AdminClient, payment: PaymentRecord) {
+  if (payment.payment_type === "appointment_full") {
+    if (!payment.appointment_id) throw new PaymentFlowError("Payment is missing its appointment", 409);
+
+    const { data: appointment, error: appointmentError } = await adminClient
+      .from("appointments")
+      .select("id, client_id, professional_id, service_id, status, payment_made_at, service:professional_services(title)")
+      .eq("id", payment.appointment_id)
+      .single<AppointmentPaymentPayload>();
+
+    if (appointmentError || !appointment) throw new PaymentFlowError("Appointment not found for payment", 404, appointmentError?.message);
+    if (["cancelled", "declined"].includes(appointment.status)) {
+      throw new PaymentFlowError("Cancelled or declined appointments cannot be paid", 409);
+    }
+
+    if (!appointment.payment_made_at) {
+      const { error: updateError } = await adminClient
+        .from("appointments")
+        .update({
+          payment_made_at: new Date().toISOString(),
+          payment_made_by: payment.payer_id,
+          payment_reference: payment.provider_reference
+        })
+        .eq("id", appointment.id);
+
+      if (updateError) throw new PaymentFlowError("Could not record appointment payment", 400, updateError.message);
+
+      const service = normalizeRelation(appointment.service);
+      await adminClient.from("notifications").insert({
+        user_id: appointment.professional_id,
+        type: "appointment_payment_made",
+        title: "Appointment payment made",
+        body: `The client paid for the appointment${service?.title ? ` for "${service.title}"` : ""}.`,
+        data: {
+          appointment_id: appointment.id,
+          payment_id: payment.id,
+          service_id: appointment.service_id
+        },
+        channel: "in_app"
+      });
+    }
+
+    const { data: updatedAppointment, error: updatedError } = await adminClient
+      .from("appointments")
+      .select("*, client:profiles!appointments_client_id_fkey(id, first_name, last_name, avatar_url, phone_verified), professional:profiles!appointments_professional_id_fkey(id, first_name, last_name, avatar_url, phone_verified, professional_profiles(*, professional_categories(category:categories(*)), professional_services(*, category:categories(*)))), service:professional_services(*), availability:professional_availability(*), reschedule_requests:appointment_reschedule_requests(*)")
+      .eq("id", appointment.id)
+      .single();
+
+    if (updatedError || !updatedAppointment) throw new PaymentFlowError("Payment recorded, but appointment could not be refreshed", 400, updatedError?.message);
+    return updatedAppointment;
+  }
+
   if (payment.payment_type !== "job_upfront" && payment.payment_type !== "job_final") return null;
   if (!payment.conversation_id) throw new PaymentFlowError("Payment is missing its conversation", 409);
 
@@ -341,7 +518,7 @@ export async function settleSuccessfulPayment(adminClient: AdminClient, payment:
 export async function applyPaystackPaymentData(adminClient: AdminClient, reference: string, transaction: PaystackTransactionData, source: "verify" | "webhook") {
   const { data: payment, error: paymentError } = await adminClient
     .from("payments")
-    .select("id, conversation_id, appointment_id, job_id, quote_id, payer_id, professional_id, payment_type, amount, currency, provider_reference, status")
+    .select("id, conversation_id, appointment_id, job_id, quote_id, payer_id, professional_id, payment_type, amount, currency, provider_reference, receipt_number, status")
     .eq("provider", "paystack")
     .eq("provider_reference", reference)
     .single<PaymentRecord>();
@@ -373,13 +550,15 @@ export async function applyPaystackPaymentData(adminClient: AdminClient, referen
     .update({
       paid_at: status === "success" ? transaction.paid_at ?? now : null,
       provider_transaction_id: transaction.id ? String(transaction.id) : null,
+      receipt_issued_at: status === "success" ? now : null,
+      receipt_number: status === "success" ? payment.receipt_number ?? createReceiptNumber(payment.id) : null,
       raw_response: { [source]: transaction },
       status,
       verified_at: source === "verify" ? now : undefined,
       webhook_received_at: source === "webhook" ? now : undefined
     })
     .eq("id", payment.id)
-    .select("id, conversation_id, appointment_id, job_id, quote_id, payer_id, professional_id, payment_type, amount, currency, provider_reference, status")
+    .select("id, conversation_id, appointment_id, job_id, quote_id, payer_id, professional_id, payment_type, amount, currency, provider_reference, receipt_number, status")
     .single<PaymentRecord>();
 
   if (updateError || !updatedPayment) throw new PaymentFlowError("Could not update payment status", 400, updateError?.message);
