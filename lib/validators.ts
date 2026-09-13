@@ -70,6 +70,9 @@ const professionalServiceSchema = z.object({
 export const professionalServiceCreateSchema = professionalServiceSchema.refine((data) => data.price_max >= data.price_min, {
   message: "Maximum price must be greater than or equal to minimum price",
   path: ["price_max"]
+}).refine((data) => data.price_max === data.price_min, {
+  message: "Professional services must use one fixed price",
+  path: ["price_max"]
 });
 
 export const professionalServicePatchSchema = professionalServiceSchema
@@ -80,7 +83,11 @@ export const professionalServicePatchSchema = professionalServiceSchema
     currency: z.string().trim().min(3).max(3).transform((value) => value.toUpperCase()).optional(),
     is_active: z.boolean().optional()
   })
-  .strict();
+  .strict()
+  .refine((data) => data.price_min === undefined || data.price_max === undefined || data.price_max === data.price_min, {
+    message: "Professional services must use one fixed price",
+    path: ["price_max"]
+  });
 
 export const setCategoriesSchema = z.object({
   category_ids: z.array(z.string().uuid()).min(1)
