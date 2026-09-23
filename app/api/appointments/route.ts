@@ -16,12 +16,14 @@ type AppointmentListItem = {
 type UnreadMessage = {
   appointment_id?: string | null;
   inquiry_id?: string | null;
+  created_at: string;
 };
 
 type UnreadNotification = {
   id: string;
   type: string;
   data?: { appointment_id?: unknown } | null;
+  created_at: string;
 };
 
 async function attachAppointmentActivity(
@@ -52,13 +54,13 @@ async function attachAppointmentActivity(
   const [{ data: unreadMessages, error: messageError }, { data: unreadNotifications, error: notificationError }] = await Promise.all([
     auth.adminClient
       .from("messages")
-      .select("appointment_id, inquiry_id")
+      .select("appointment_id, inquiry_id, created_at")
       .eq("receiver_id", auth.userId)
       .eq("is_read", false)
       .limit(1000),
     auth.adminClient
       .from("notifications")
-      .select("id, type, data")
+      .select("id, type, data, created_at")
       .eq("user_id", auth.userId)
       .eq("is_read", false)
       .order("created_at", { ascending: false })
@@ -69,6 +71,7 @@ async function attachAppointmentActivity(
   if (notificationError) throw new Error(notificationError.message);
 
   const messageCounts = new Map<string, number>();
+  const latestIndicatorAt = new Map<string, number>();
   for (const message of (unreadMessages ?? []) as UnreadMessage[]) {
     let appointmentId = message.appointment_id ?? null;
     if (!appointmentId && message.inquiry_id) {
@@ -76,6 +79,10 @@ async function attachAppointmentActivity(
     }
     if (!appointmentId || !appointmentIds.has(appointmentId)) continue;
     messageCounts.set(appointmentId, (messageCounts.get(appointmentId) ?? 0) + 1);
+    const createdAt = new Date(message.created_at).getTime();
+    if (Number.isFinite(createdAt)) {
+      latestIndicatorAt.set(appointmentId, Math.max(latestIndicatorAt.get(appointmentId) ?? 0, createdAt));
+    }
   }
 
   const updateIds = new Map<string, string[]>();
@@ -88,13 +95,20 @@ async function attachAppointmentActivity(
     const related = updateIds.get(appointmentId) ?? [];
     related.push(notification.id);
     updateIds.set(appointmentId, related);
+    const createdAt = new Date(notification.created_at).getTime();
+    if (Number.isFinite(createdAt)) {
+      latestIndicatorAt.set(appointmentId, Math.max(latestIndicatorAt.get(appointmentId) ?? 0, createdAt));
+    }
   }
 
   return appointments.map((appointment) => ({
     ...appointment,
     unread_message_count: messageCounts.get(appointment.id) ?? 0,
     unread_update_count: updateIds.get(appointment.id)?.length ?? 0,
-    unread_update_notification_ids: updateIds.get(appointment.id) ?? []
+    unread_update_notification_ids: updateIds.get(appointment.id) ?? [],
+    latest_indicator_at: latestIndicatorAt.has(appointment.id)
+      ? new Date(latestIndicatorAt.get(appointment.id)!).toISOString()
+      : null
   }));
 }
 
