@@ -78,6 +78,7 @@ type AppointmentPaymentPayload = {
   status: string;
   payment_made_at?: string | null;
   payment_reference?: string | null;
+  hired_at?: string | null;
   service?: {
     id: string;
     title?: string | null;
@@ -292,8 +293,8 @@ export async function initializeAppointmentPayment(auth: AuthContext, request: R
   if (appointmentError || !appointment) throw new PaymentFlowError("Appointment not found", 404, appointmentError?.message);
   if (appointment.client_id !== auth.userId) throw new PaymentFlowError("Only the client can pay for this appointment", 403);
   if (appointment.payment_made_at) throw new PaymentFlowError("This appointment has already been paid", 409);
-  if (["cancelled", "declined"].includes(appointment.status)) {
-    throw new PaymentFlowError("Cancelled or declined appointments cannot be paid", 409);
+  if (appointment.status !== "accepted") {
+    throw new PaymentFlowError("The appointment must be accepted before hiring and payment can continue", 409);
   }
 
   const service = normalizeRelation(appointment.service);
@@ -383,14 +384,16 @@ export async function settleSuccessfulPayment(adminClient: AdminClient, payment:
       .single<AppointmentPaymentPayload>();
 
     if (appointmentError || !appointment) throw new PaymentFlowError("Appointment not found for payment", 404, appointmentError?.message);
-    if (["cancelled", "declined"].includes(appointment.status)) {
-      throw new PaymentFlowError("Cancelled or declined appointments cannot be paid", 409);
+    if (appointment.status !== "accepted") {
+      throw new PaymentFlowError("The appointment must be accepted before hiring and payment can continue", 409);
     }
 
     if (!appointment.payment_made_at) {
       const { error: updateError } = await adminClient
         .from("appointments")
         .update({
+          hired_at: new Date().toISOString(),
+          hired_by: payment.payer_id,
           payment_made_at: new Date().toISOString(),
           payment_made_by: payment.payer_id,
           payment_reference: payment.provider_reference
@@ -408,6 +411,20 @@ export async function settleSuccessfulPayment(adminClient: AdminClient, payment:
         data: {
           appointment_id: appointment.id,
           payment_id: payment.id,
+          service_id: appointment.service_id
+        },
+        channel: "in_app"
+      });
+
+      await adminClient.from("notifications").insert({
+        user_id: appointment.client_id,
+        type: "appointment_payment_confirmed",
+        title: "Appointment payment confirmed",
+        body: `Your appointment payment${service?.title ? ` for "${service.title}"` : ""} was successful. Your receipt is ready.`,
+        data: {
+          appointment_id: appointment.id,
+          payment_id: payment.id,
+          payment_reference: payment.provider_reference,
           service_id: appointment.service_id
         },
         channel: "in_app"
