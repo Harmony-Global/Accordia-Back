@@ -41,11 +41,13 @@ export async function POST(request: Request, { params }: Params) {
   if (appointmentError || !appointment) return fail("Appointment not found", 404, appointmentError?.message);
   if (appointment.client_id !== auth.userId) return fail("Only the client can pay for this appointment", 403);
   if (appointment.payment_made_at) return fail("This appointment has already been paid", 409);
-  if (["cancelled", "declined"].includes(appointment.status)) return fail("Cancelled or declined appointments cannot be paid", 409);
+  if (appointment.status !== "accepted") return fail("The appointment must be accepted before hiring and payment can continue", 409);
 
   const { error: updateError } = await auth.adminClient
     .from("appointments")
     .update({
+      hired_at: new Date().toISOString(),
+      hired_by: auth.userId,
       payment_made_at: new Date().toISOString(),
       payment_made_by: auth.userId,
       payment_reference: null
@@ -60,6 +62,18 @@ export async function POST(request: Request, { params }: Params) {
     type: "appointment_payment_made",
     title: "Appointment payment made",
     body: `The client paid for the appointment${service?.title ? ` for "${service.title}"` : ""}.`,
+    data: {
+      appointment_id: appointment.id,
+      service_id: appointment.service_id
+    },
+    channel: "in_app"
+  });
+
+  await auth.adminClient.from("notifications").insert({
+    user_id: appointment.client_id,
+    type: "appointment_payment_confirmed",
+    title: "Appointment payment confirmed",
+    body: `Your appointment payment${service?.title ? ` for "${service.title}"` : ""} was successful. Your receipt is ready.`,
     data: {
       appointment_id: appointment.id,
       service_id: appointment.service_id
