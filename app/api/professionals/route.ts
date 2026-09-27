@@ -142,16 +142,23 @@ export async function GET(request: Request) {
   const ratingSummaries = new Map<string, ProfessionalRatingSummary>();
 
   if (professionalIds.length > 0) {
-    const { data: reviews, error: reviewsError } = await auth.adminClient
-      .from("conversation_reviews")
-      .select("professional_id, rating")
-      .in("professional_id", professionalIds)
-      .eq("skipped", false)
-      .not("rating", "is", null);
+    const [jobResult, appointmentResult] = await Promise.all([
+      auth.adminClient.from("conversation_reviews")
+        .select("professional_id, rating")
+        .in("professional_id", professionalIds)
+        .eq("skipped", false)
+        .not("rating", "is", null),
+      auth.adminClient.from("appointment_reviews")
+        .select("professional_id, rating")
+        .in("professional_id", professionalIds)
+        .eq("skipped", false)
+        .not("rating", "is", null)
+    ]);
+    if (jobResult.error || appointmentResult.error) {
+      return fail("Could not load professional ratings", 400, jobResult.error?.message ?? appointmentResult.error?.message);
+    }
 
-    if (reviewsError) return fail("Could not load professional ratings", 400, reviewsError.message);
-
-    for (const review of reviews ?? []) {
+    for (const review of [...(jobResult.data ?? []), ...(appointmentResult.data ?? [])]) {
       const professionalId = review.professional_id as string;
       const rating = Number(review.rating);
       if (!professionalId || Number.isNaN(rating)) continue;
