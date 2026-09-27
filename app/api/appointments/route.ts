@@ -2,7 +2,7 @@ import { created, fail, ok } from "@/lib/api";
 import { requireRole, requireUser } from "@/lib/auth";
 import { appointmentCreateSchema } from "@/lib/validators";
 
-const appointmentSelect = "*, client:profiles!appointments_client_id_fkey(id, first_name, last_name, avatar_url, phone_verified), professional:profiles!appointments_professional_id_fkey(id, first_name, last_name, avatar_url, phone_verified, professional_profiles(*, professional_categories(category:categories(*)), professional_services(*, category:categories(*)))), service:professional_services(*), availability:professional_availability(*), reschedule_requests:appointment_reschedule_requests(*)";
+const appointmentSelect = "*, client:profiles!appointments_client_id_fkey(id, first_name, last_name, avatar_url, phone_verified, location, state), professional:profiles!appointments_professional_id_fkey(id, first_name, last_name, avatar_url, phone_verified, professional_profiles(*, professional_categories(category:categories(*)), professional_services(*, category:categories(*)))), service:professional_services(*), availability:professional_availability(*), reschedule_requests:appointment_reschedule_requests(*), review:appointment_reviews(*)";
 
 type AppointmentListItem = {
   id: string;
@@ -33,6 +33,7 @@ async function attachAppointmentActivity(
   if (appointments.length === 0) return appointments;
 
   const appointmentIds = new Set(appointments.map((appointment) => appointment.id));
+  const appointmentStatuses = new Map(appointments.map((appointment) => [appointment.id, appointment.status]));
   const appointmentsByInquiry = new Map<string, AppointmentListItem[]>();
 
   for (const appointment of appointments) {
@@ -57,6 +58,7 @@ async function attachAppointmentActivity(
       .select("appointment_id, inquiry_id, created_at")
       .eq("receiver_id", auth.userId)
       .eq("is_read", false)
+      .order("created_at", { ascending: false })
       .limit(1000),
     auth.adminClient
       .from("notifications")
@@ -72,6 +74,7 @@ async function attachAppointmentActivity(
 
   const messageCounts = new Map<string, number>();
   const latestIndicatorAt = new Map<string, number>();
+  const latestMessageAt = new Map<string, number>();
   for (const message of (unreadMessages ?? []) as UnreadMessage[]) {
     let appointmentId = message.appointment_id ?? null;
     if (!appointmentId && message.inquiry_id) {
@@ -82,22 +85,26 @@ async function attachAppointmentActivity(
     const createdAt = new Date(message.created_at).getTime();
     if (Number.isFinite(createdAt)) {
       latestIndicatorAt.set(appointmentId, Math.max(latestIndicatorAt.get(appointmentId) ?? 0, createdAt));
+      latestMessageAt.set(appointmentId, Math.max(latestMessageAt.get(appointmentId) ?? 0, createdAt));
     }
   }
 
   const updateIds = new Map<string, string[]>();
+  const latestUpdateAt = new Map<string, number>();
   for (const notification of (unreadNotifications ?? []) as UnreadNotification[]) {
     if (notification.type === "appointment_message") continue;
     const appointmentId = typeof notification.data?.appointment_id === "string"
       ? notification.data.appointment_id
       : null;
     if (!appointmentId || !appointmentIds.has(appointmentId)) continue;
+    if (notification.type === "appointment_requested" && appointmentStatuses.get(appointmentId) === "requested") continue;
     const related = updateIds.get(appointmentId) ?? [];
     related.push(notification.id);
     updateIds.set(appointmentId, related);
     const createdAt = new Date(notification.created_at).getTime();
     if (Number.isFinite(createdAt)) {
       latestIndicatorAt.set(appointmentId, Math.max(latestIndicatorAt.get(appointmentId) ?? 0, createdAt));
+      latestUpdateAt.set(appointmentId, Math.max(latestUpdateAt.get(appointmentId) ?? 0, createdAt));
     }
   }
 
@@ -106,6 +113,12 @@ async function attachAppointmentActivity(
     unread_message_count: messageCounts.get(appointment.id) ?? 0,
     unread_update_count: updateIds.get(appointment.id)?.length ?? 0,
     unread_update_notification_ids: updateIds.get(appointment.id) ?? [],
+    latest_message_at: latestMessageAt.has(appointment.id)
+      ? new Date(latestMessageAt.get(appointment.id)!).toISOString()
+      : null,
+    latest_update_at: latestUpdateAt.has(appointment.id)
+      ? new Date(latestUpdateAt.get(appointment.id)!).toISOString()
+      : null,
     latest_indicator_at: latestIndicatorAt.has(appointment.id)
       ? new Date(latestIndicatorAt.get(appointment.id)!).toISOString()
       : null

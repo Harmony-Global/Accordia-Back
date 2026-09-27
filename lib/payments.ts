@@ -79,6 +79,8 @@ type AppointmentPaymentPayload = {
   payment_made_at?: string | null;
   payment_reference?: string | null;
   hired_at?: string | null;
+  price_amount?: number | string | null;
+  price_currency?: string | null;
   service?: {
     id: string;
     title?: string | null;
@@ -286,7 +288,7 @@ export async function initializeJobPayment(auth: AuthContext, request: Request, 
 export async function initializeAppointmentPayment(auth: AuthContext, request: Request, appointmentId: string) {
   const { data: appointment, error: appointmentError } = await auth.adminClient
     .from("appointments")
-    .select("id, client_id, professional_id, service_id, status, payment_made_at, service:professional_services(id, title, price_min, price_max, currency), client:profiles!appointments_client_id_fkey(id, email)")
+    .select("id, client_id, professional_id, service_id, status, hired_at, payment_made_at, price_amount, price_currency, service:professional_services(id, title, price_min, price_max, currency), client:profiles!appointments_client_id_fkey(id, email)")
     .eq("id", appointmentId)
     .single<AppointmentPaymentPayload>();
 
@@ -296,23 +298,17 @@ export async function initializeAppointmentPayment(auth: AuthContext, request: R
   if (appointment.status !== "accepted") {
     throw new PaymentFlowError("The appointment must be accepted before hiring and payment can continue", 409);
   }
+  if (!appointment.hired_at) throw new PaymentFlowError("Confirm hire before payment", 409);
 
-  const service = normalizeRelation(appointment.service);
-  if (!service) throw new PaymentFlowError("This appointment must be linked to a priced service before payment can continue", 409);
-
-  const priceMin = Number(service.price_min);
-  const priceMax = Number(service.price_max);
-  if (!Number.isFinite(priceMin) || priceMin <= 0) throw new PaymentFlowError("This service does not have a valid appointment price", 409);
-  if (Number.isFinite(priceMax) && priceMax !== priceMin) {
-    throw new PaymentFlowError("This service needs one fixed price before appointment payment can continue", 409);
-  }
+  const priceMin = Number(appointment.price_amount);
+  if (!Number.isFinite(priceMin) || priceMin <= 0) throw new PaymentFlowError("This appointment needs support to confirm its original price before payment", 409);
 
   const client = normalizeRelation(appointment.client);
   const email = client?.email;
   if (!email) throw new PaymentFlowError("Client email is required before payment can continue", 409);
 
   const amount = normalizePaymentAmount(priceMin);
-  const currency = (service.currency ?? env.paystackCurrency).toUpperCase();
+  const currency = (appointment.price_currency ?? env.paystackCurrency).toUpperCase();
   const reference = createPaystackReference("APPOINTMENT");
   const callbackUrl = buildPaymentCallbackUrl(request, reference);
   const metadata = {
@@ -379,7 +375,7 @@ export async function settleSuccessfulPayment(adminClient: AdminClient, payment:
 
     const { data: appointment, error: appointmentError } = await adminClient
       .from("appointments")
-      .select("id, client_id, professional_id, service_id, status, payment_made_at, service:professional_services(title)")
+      .select("id, client_id, professional_id, service_id, status, hired_at, payment_made_at, service:professional_services(title)")
       .eq("id", payment.appointment_id)
       .single<AppointmentPaymentPayload>();
 
@@ -392,7 +388,7 @@ export async function settleSuccessfulPayment(adminClient: AdminClient, payment:
       const { error: updateError } = await adminClient
         .from("appointments")
         .update({
-          hired_at: new Date().toISOString(),
+          hired_at: appointment.hired_at ?? new Date().toISOString(),
           hired_by: payment.payer_id,
           payment_made_at: new Date().toISOString(),
           payment_made_by: payment.payer_id,

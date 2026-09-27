@@ -184,11 +184,25 @@ export const professionalInquirySchema = z.object({
 });
 
 export const availabilityCreateSchema = z.object({
-  service_id: z.string().uuid().nullable().optional(),
+  service_id: z.string().uuid(),
   starts_at: z.string().datetime(),
   ends_at: z.string().datetime(),
-  note: z.string().max(1000).nullable().optional()
+  note: z.string().max(1000).nullable().optional(),
+  capacity: z.number().int().min(1)
 });
+
+export const availabilityUpdateSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("pause") }).strict(),
+  z.object({ action: z.literal("resume") }).strict(),
+  z.object({
+    action: z.literal("edit"),
+    service_id: z.string().uuid(),
+    starts_at: z.string().datetime(),
+    ends_at: z.string().datetime(),
+    note: z.string().max(1000).nullable(),
+    capacity: z.number().int().min(1)
+  }).strict()
+]);
 
 export const appointmentCreateSchema = z.object({
   availability_id: z.string().uuid(),

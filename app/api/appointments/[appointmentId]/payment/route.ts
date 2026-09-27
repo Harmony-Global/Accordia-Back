@@ -14,6 +14,8 @@ type AppointmentPayload = {
   professional_id: string;
   service_id: string | null;
   status: string;
+  hired_at?: string | null;
+  price_amount?: number | string | null;
   payment_made_at?: string | null;
   payment_reference?: string | null;
   service?: { title?: string | null } | { title?: string | null }[] | null;
@@ -32,9 +34,13 @@ export async function POST(request: Request, { params }: Params) {
     }
   }
 
+  if (process.env.NODE_ENV === "production" || process.env.ALLOW_LOCAL_MOCK_PAYMENTS !== "true") {
+    return fail("Paystack is not configured for appointment payments", 503);
+  }
+
   const { data: appointment, error: appointmentError } = await auth.adminClient
     .from("appointments")
-    .select("id, client_id, professional_id, service_id, status, payment_made_at, service:professional_services(title)")
+    .select("id, client_id, professional_id, service_id, status, hired_at, payment_made_at, price_amount, service:professional_services(title)")
     .eq("id", params.appointmentId)
     .single<AppointmentPayload>();
 
@@ -42,11 +48,13 @@ export async function POST(request: Request, { params }: Params) {
   if (appointment.client_id !== auth.userId) return fail("Only the client can pay for this appointment", 403);
   if (appointment.payment_made_at) return fail("This appointment has already been paid", 409);
   if (appointment.status !== "accepted") return fail("The appointment must be accepted before hiring and payment can continue", 409);
+  if (!appointment.hired_at) return fail("Confirm hire before payment", 409);
+  if (!appointment.price_amount) return fail("This appointment needs support to confirm its original price before payment", 409);
 
   const { error: updateError } = await auth.adminClient
     .from("appointments")
     .update({
-      hired_at: new Date().toISOString(),
+      hired_at: appointment.hired_at ?? new Date().toISOString(),
       hired_by: auth.userId,
       payment_made_at: new Date().toISOString(),
       payment_made_by: auth.userId,
