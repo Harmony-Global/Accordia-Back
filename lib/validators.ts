@@ -44,6 +44,8 @@ export const profilePatchSchema = z.object({
   first_name: z.string().min(1).optional(),
   last_name: z.string().min(1).optional(),
   phone: z.string().min(7).optional(),
+  location: z.string().max(255).nullable().optional(),
+  state: z.string().max(255).nullable().optional(),
   avatar_url: z.string().trim().max(2048).refine((value) => normalizeAvatarUrl(value) === value, "Avatar must be an http(s) image URL, not inline image data").nullable().optional()
 }).strict();
 
@@ -61,10 +63,12 @@ const professionalServiceSchema = z.object({
   title: z.string().min(3).max(160),
   description: z.string().min(10).max(3000),
   image_url: z.string().url().max(2048),
+  image_urls: z.array(z.string().url().max(2048)).min(1).max(5).optional(),
   price_min: z.number().min(0),
   price_max: z.number().min(0),
   currency: z.string().trim().min(3).max(3).transform((value) => value.toUpperCase()).default("NGN"),
-  is_active: z.boolean().default(true)
+  is_active: z.boolean().default(true),
+  is_visible_on_profile: z.boolean().default(true)
 }).strict();
 
 export const professionalServiceCreateSchema = professionalServiceSchema.refine((data) => data.price_max >= data.price_min, {
@@ -76,12 +80,13 @@ export const professionalServiceCreateSchema = professionalServiceSchema.refine(
 });
 
 export const professionalServicePatchSchema = professionalServiceSchema
-  .omit({ offering_type: true, currency: true, is_active: true })
+  .omit({ offering_type: true, currency: true, is_active: true, is_visible_on_profile: true })
   .partial()
   .extend({
     offering_type: z.enum(["service", "product"]).optional(),
     currency: z.string().trim().min(3).max(3).transform((value) => value.toUpperCase()).optional(),
-    is_active: z.boolean().optional()
+    is_active: z.boolean().optional(),
+    is_visible_on_profile: z.boolean().optional()
   })
   .strict()
   .refine((data) => data.price_min === undefined || data.price_max === undefined || data.price_max === data.price_min, {
@@ -90,7 +95,8 @@ export const professionalServicePatchSchema = professionalServiceSchema
   });
 
 export const setCategoriesSchema = z.object({
-  category_ids: z.array(z.string().uuid()).min(1)
+  main_category_ids: z.array(z.string().uuid()).max(5),
+  category_ids: z.array(z.string().uuid())
 });
 
 export const createJobSchema = z.object({

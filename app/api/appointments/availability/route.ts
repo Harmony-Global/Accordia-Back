@@ -48,7 +48,10 @@ export async function GET(request: Request) {
     .map((slot) => {
       const service = Array.isArray(slot.service) ? slot.service[0] : slot.service;
       const price = Number(service?.price_min);
-      const fixedService = Boolean(service?.is_active && Number.isFinite(price) && price > 0 && Number(service?.price_max) === price);
+      const fresh = service?.offering_type !== "service" ||
+        (service?.activity_anchor_at && new Date(service.activity_anchor_at).getTime() > Date.now() - 90 * 86400000);
+      const fixedService = Boolean(service?.is_active && service?.is_visible_on_profile && !service?.archived_at
+        && fresh && Number.isFinite(price) && price > 0 && Number(service?.price_max) === price);
       return {
         ...slot,
         status: slot.status === "open" && !fixedService ? "blocked" : slot.status,

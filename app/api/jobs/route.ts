@@ -87,6 +87,15 @@ export async function POST(request: Request) {
   const body = createJobSchema.safeParse(await request.json());
   if (!body.success) return fail("Invalid job payload", 422, body.error.flatten());
 
+  const { data: category, error: categoryError } = await auth.adminClient
+    .from("categories")
+    .select("id,level,is_active")
+    .eq("id", body.data.category_id)
+    .single();
+  if (categoryError || !category || category.level !== "sub" || !category.is_active) {
+    return fail("Choose an active subcategory for this request", 422);
+  }
+
   const { data: job, error } = await auth.adminClient
     .from("jobs")
     .insert({ ...body.data, client_id: auth.userId })

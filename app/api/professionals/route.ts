@@ -1,5 +1,6 @@
 import { fail, ok, parseSearchParams } from "@/lib/api";
 import { requireRole } from "@/lib/auth";
+import { signedPortfolio } from "@/lib/portfolio";
 
 type SearchCategoryLink = {
   category?: {
@@ -15,6 +16,10 @@ type SearchCategoryLink = {
 
 type SearchService = {
   is_active: boolean;
+  is_visible_on_profile?: boolean;
+  archived_at?: string | null;
+  activity_anchor_at?: string | null;
+  offering_type?: string;
   title?: string | null;
   description?: string | null;
   category_id?: string | null;
@@ -98,6 +103,17 @@ export async function GET(request: Request) {
   const query = normalize(params.get("q"));
   const categoryId = params.get("category_id");
   const state = normalize(params.get("state"));
+  const categoryIds = new Set<string>(categoryId ? [categoryId] : []);
+  if (categoryId) {
+    const { data: tree, error: treeError } = await auth.adminClient.from("categories")
+      .select("id, parent_id, level").eq("is_active", true);
+    if (treeError) return fail("Could not load category filters", 400, treeError.message);
+    for (let depth = 0; depth < 2; depth += 1) {
+      for (const category of tree ?? []) {
+        if (category.parent_id && categoryIds.has(category.parent_id)) categoryIds.add(category.id);
+      }
+    }
+  }
 
   const { data, error } = await auth.adminClient
     .from("professional_profiles")
@@ -112,7 +128,8 @@ export async function GET(request: Request) {
       updated_at,
       profile:profiles!professional_profiles_user_id_fkey(id, first_name, last_name, avatar_url, phone_verified, is_active),
       professional_categories(category:categories(id, name, slug, icon)),
-      professional_services(id, professional_id, category_id, offering_type, title, description, image_url, price_min, price_max, currency, is_active, created_at, updated_at, category:categories(id, name, slug, icon))
+      professional_main_categories(category:categories(id, name, slug, icon)),
+      professional_services(id, professional_id, category_id, offering_type, title, description, image_url, price_min, price_max, currency, is_active, is_visible_on_profile, archived_at, activity_anchor_at, created_at, updated_at, category:categories(id, name, slug, icon, level, parent_id))
     `)
     .eq("is_available", true)
     .order("updated_at", { ascending: false })
@@ -122,7 +139,10 @@ export async function GET(request: Request) {
 
   const professionals = (data ?? [])
     .map((professional) => {
-      const activeServices = (professional.professional_services ?? []).filter((service: SearchService) => service.is_active);
+      const activeServices = (professional.professional_services ?? []).filter((service: SearchService) =>
+        service.is_active && service.is_visible_on_profile && !service.archived_at
+        && (service.offering_type === "product" || Boolean(service.activity_anchor_at
+          && new Date(service.activity_anchor_at).getTime() > Date.now() - 90 * 86400000)));
       return {
         ...professional,
         professional_services: activeServices
@@ -132,8 +152,10 @@ export async function GET(request: Request) {
     .filter((professional) => !state || normalize(professional.state ?? professional.location ?? "").includes(state))
     .filter((professional) => {
       if (!categoryId) return true;
-      const categoryMatch = (professional.professional_categories ?? []).some((item) => categoryValue(item)?.id === categoryId);
-      const serviceMatch = (professional.professional_services ?? []).some((service) => service.category_id === categoryId);
+      const categoryMatch = (professional.professional_categories ?? []).some((item) =>
+        categoryIds.has(categoryValue(item)?.id ?? ""));
+      const serviceMatch = (professional.professional_services ?? []).some((service) =>
+        categoryIds.has(service.category_id ?? ""));
       return categoryMatch || serviceMatch;
     })
     .filter((professional) => professionalMatchesQuery(professional, query));
@@ -173,9 +195,17 @@ export async function GET(request: Request) {
     }
   }
 
+  let portfolios: Awaited<ReturnType<typeof signedPortfolio>>[];
+  try {
+    portfolios = await Promise.all(professionals.map((professional) => signedPortfolio(auth.adminClient, professional.user_id ?? "")));
+  } catch (portfolioError) {
+    return fail("Could not load portfolios", 400, String(portfolioError));
+  }
+
   return ok({
-    professionals: professionals.map((professional) => ({
+    professionals: professionals.map((professional, index) => ({
       ...professional,
+      portfolio: portfolios[index],
       ...getProfessionalRatingSummary(professional, ratingSummaries)
     }))
   });

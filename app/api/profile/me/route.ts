@@ -1,6 +1,7 @@
 import { fail, ok } from "@/lib/api";
 import { requireUser } from "@/lib/auth";
 import { professionalProfilePatchSchema, profilePatchSchema } from "@/lib/validators";
+import { signedPortfolio } from "@/lib/portfolio";
 
 export async function GET(request: Request) {
   const auth = await requireUser(request);
@@ -12,6 +13,8 @@ export async function GET(request: Request) {
       id,
       email,
       phone,
+      location,
+      state,
       role,
       first_name,
       last_name,
@@ -29,6 +32,7 @@ export async function GET(request: Request) {
         state,
         is_available,
         professional_categories(category:categories(id, name, slug, icon, description)),
+        professional_main_categories(category:categories(id, name, slug, icon, description)),
         professional_services(id, professional_id, category_id, offering_type, title, description, image_url, price_min, price_max, currency, is_active, created_at, updated_at, category:categories(id, name, slug, icon))
       )
     `)
@@ -44,8 +48,30 @@ export async function GET(request: Request) {
     (service: { is_active: boolean }) => service.is_active
   ).length ?? 0;
 
+  let rating_average: number | null = null;
+  let review_count = 0;
+  let portfolio: Awaited<ReturnType<typeof signedPortfolio>> = [];
+  if (auth.role === "professional") {
+    const [jobs, appointments] = await Promise.all([
+      auth.adminClient.from("conversation_reviews").select("rating").eq("professional_id", auth.userId)
+        .eq("skipped", false).not("rating", "is", null),
+      auth.adminClient.from("appointment_reviews").select("rating").eq("professional_id", auth.userId)
+        .eq("skipped", false).not("rating", "is", null)
+    ]);
+    if (jobs.error || appointments.error) return fail("Could not load ratings", 400, jobs.error?.message ?? appointments.error?.message);
+    const ratings = [...(jobs.data ?? []), ...(appointments.data ?? [])].map((row) => Number(row.rating));
+    review_count = ratings.length;
+    if (ratings.length) rating_average = Number((ratings.reduce((sum, value) => sum + value, 0) / ratings.length).toFixed(1));
+    try { portfolio = await signedPortfolio(auth.adminClient, auth.userId); }
+    catch (portfolioError) { return fail("Could not load portfolio", 400, String(portfolioError)); }
+  }
+
   return ok({
     profile,
+    rating_average,
+    review_count,
+    portfolio,
+    verification_progress: profile.phone_verified ? 100 : 0,
     professional_services_progress: auth.role === "professional"
       ? {
           service_count: activeServiceCount,
@@ -79,6 +105,10 @@ export async function PATCH(request: Request) {
     const update: Record<string, string | boolean | null> = {};
     if (profilePatch.data.first_name !== undefined) update.first_name = profilePatch.data.first_name;
     if (profilePatch.data.last_name !== undefined) update.last_name = profilePatch.data.last_name;
+    if (auth.role === "client") {
+      if (profilePatch.data.location !== undefined) update.location = profilePatch.data.location;
+      if (profilePatch.data.state !== undefined) update.state = profilePatch.data.state;
+    }
     if (profilePatch.data.phone !== undefined) {
       update.phone = profilePatch.data.phone;
       if (profilePatch.data.phone !== currentProfile.phone) update.phone_verified = false;
