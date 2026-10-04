@@ -72,7 +72,7 @@ export async function sendWelcomeMessage(input: {
     title: "Welcome to Accordia",
     body,
     data: {
-      next_step: input.role === "professional" ? "/professional/categories" : "/dashboard"
+      next_step: input.role === "professional" ? "/profile#categories" : "/dashboard"
     },
     channel: "in_app"
   });

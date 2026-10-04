@@ -8,7 +8,7 @@ export async function GET(request: Request) {
 
   const { data: professionalProfile, error: profileError } = await auth.adminClient
     .from("professional_profiles")
-    .select("id, professional_categories(category:categories(*))")
+    .select("id, professional_categories(category:categories(*)), professional_main_categories(category:categories(*))")
     .eq("user_id", auth.userId)
     .single();
 
@@ -17,7 +17,10 @@ export async function GET(request: Request) {
     (row: { category: unknown }) => row.category
   );
 
-  return ok({ categories });
+  const mainCategories = (professionalProfile.professional_main_categories ?? []).map(
+    (row: { category: unknown }) => row.category
+  );
+  return ok({ categories, main_categories: mainCategories });
 }
 
 export async function PUT(request: Request) {
@@ -27,28 +30,12 @@ export async function PUT(request: Request) {
   const body = setCategoriesSchema.safeParse(await request.json());
   if (!body.success) return fail("Invalid category payload", 422, body.error.flatten());
 
-  const { data: professionalProfile, error: profileError } = await auth.adminClient
-    .from("professional_profiles")
-    .select("id")
-    .eq("user_id", auth.userId)
-    .single();
-
-  if (profileError) return fail("Professional profile not found", 404, profileError.message);
-
-  const { error: deleteError } = await auth.adminClient
-    .from("professional_categories")
-    .delete()
-    .eq("professional_id", professionalProfile.id);
-
-  if (deleteError) return fail("Could not reset categories", 400, deleteError.message);
-
-  const rows = body.data.category_ids.map((categoryId) => ({
-    professional_id: professionalProfile.id,
-    category_id: categoryId
-  }));
-
-  const { error: insertError } = await auth.adminClient.from("professional_categories").insert(rows);
-  if (insertError) return fail("Could not save categories", 400, insertError.message);
+  const { error } = await auth.adminClient.rpc("set_professional_category_selection", {
+    p_user_id: auth.userId,
+    p_main_ids: body.data.main_category_ids,
+    p_category_ids: body.data.category_ids
+  });
+  if (error) return fail("Could not save categories", 422, error.message);
 
   return ok({ updated: true });
 }
