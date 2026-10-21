@@ -43,11 +43,24 @@ export async function PUT(request: Request) {
     return ok({ destination_id: id, review_required: needsReview });
   }
   try {
-    const [banks, resolved] = await Promise.all([
-      listPaystackBanks(), resolvePaystackAccount(input.bank_code, input.account_number)
-    ]);
+    const banks = await listPaystackBanks();
     const bank = banks.find((item) => item.code === input.bank_code && item.active !== false);
-    if (!bank || resolved.account_number !== input.account_number) return fail("Bank account could not be verified", 422);
+    if (!bank) return fail("The selected bank is no longer available. Choose it again and retry.", 422);
+    let resolved: Awaited<ReturnType<typeof resolvePaystackAccount>>;
+    try {
+      resolved = await resolvePaystackAccount(bank.code, input.account_number);
+    } catch (error) {
+      if (error instanceof PaystackError && /test mode daily limit.*live bank resolves exceeded/i.test(error.message)) {
+        return fail("Paystack's test mode has reached its daily limit for real-bank account checks. This does not mean the account is invalid. Use a supported test bank/account for testing, or retry after Paystack resets the limit. No payout details were saved.", 429);
+      }
+      if (error instanceof PaystackError && /could not resolve account name|cannot resolve account/i.test(error.message)) {
+        return fail(`Paystack could not match this account number to ${bank.name}. Check the exact bank and 10-digit number, then try again. No payout details were saved.`, 422);
+      }
+      throw error;
+    }
+    if (resolved.account_number !== input.account_number || !resolved.account_name?.trim()) {
+      return fail(`Paystack did not confirm an account name for ${bank.name}. No payout details were saved.`, 422);
+    }
     const recipient = await createPaystackRecipient({
       name: resolved.account_name,
       bank_code: input.bank_code,
