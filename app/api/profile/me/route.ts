@@ -15,6 +15,7 @@ export async function GET(request: Request) {
       phone,
       location,
       state,
+      about_me,
       role,
       first_name,
       last_name,
@@ -92,6 +93,7 @@ export async function PATCH(request: Request) {
 
   if (!profilePatch.success) return fail("Invalid profile payload", 422, profilePatch.error.flatten());
   if (!proPatch.success) return fail("Invalid professional profile payload", 422, proPatch.error.flatten());
+  if (auth.role !== "client" && profilePatch.data.about_me !== undefined) return fail("About me is only available to clients", 422);
 
   if (Object.keys(profilePatch.data).length > 0) {
     const { data: currentProfile, error: loadError } = await auth.adminClient
@@ -108,6 +110,7 @@ export async function PATCH(request: Request) {
     if (auth.role === "client") {
       if (profilePatch.data.location !== undefined) update.location = profilePatch.data.location;
       if (profilePatch.data.state !== undefined) update.state = profilePatch.data.state;
+      if (profilePatch.data.about_me !== undefined) update.about_me = profilePatch.data.about_me;
     }
     if (profilePatch.data.phone !== undefined) {
       update.phone = profilePatch.data.phone;

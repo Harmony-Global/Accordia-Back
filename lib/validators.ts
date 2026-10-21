@@ -46,6 +46,7 @@ export const profilePatchSchema = z.object({
   phone: z.string().min(7).optional(),
   location: z.string().max(255).nullable().optional(),
   state: z.string().max(255).nullable().optional(),
+  about_me: z.string().trim().max(2000).nullable().optional(),
   avatar_url: z.string().trim().max(2048).refine((value) => normalizeAvatarUrl(value) === value, "Avatar must be an http(s) image URL, not inline image data").nullable().optional()
 }).strict();
 

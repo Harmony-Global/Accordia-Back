@@ -133,3 +133,67 @@ export function verifyPaystackWebhookSignature(rawBody: string, signature: strin
 
   return crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(signature));
 }
+
+async function paystackJson<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`${env.paystackBaseUrl.replace(/\/$/, "")}${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${requirePaystackSecret()}`,
+      ...(init?.body ? { "Content-Type": "application/json" } : {}),
+      ...init?.headers
+    }
+  });
+  const result = await response.json().catch(() => null) as { status?: boolean; message?: string; data?: T } | null;
+  if (!response.ok || !result?.status || result.data === undefined) {
+    throw new PaystackError(result?.message ?? "Paystack request failed", response.status || 502, result);
+  }
+  return result.data;
+}
+
+export type PaystackBank = { name: string; code: string; active?: boolean };
+export type PaystackRecipient = {
+  recipient_code: string;
+  name: string;
+  details?: { account_number?: string; bank_code?: string; bank_name?: string };
+};
+export type PaystackTransfer = {
+  reference: string;
+  amount: number;
+  currency: string;
+  status: string;
+  transfer_code?: string;
+  transferred_at?: string | null;
+  updatedAt?: string | null;
+  recipient?: PaystackRecipient | number | string;
+};
+
+export async function listPaystackBanks() {
+  const banks: PaystackBank[] = [];
+  for (let page = 1; page <= 10; page += 1) {
+    const batch = await paystackJson<PaystackBank[]>(`/bank?country=nigeria&currency=NGN&perPage=100&page=${page}`);
+    banks.push(...batch);
+    if (batch.length < 100) break;
+  }
+  return banks;
+}
+
+export function resolvePaystackAccount(bankCode: string, accountNumber: string) {
+  return paystackJson<{ account_name: string; account_number: string; bank_id?: number }>(
+    `/bank/resolve?account_number=${encodeURIComponent(accountNumber)}&bank_code=${encodeURIComponent(bankCode)}`
+  );
+}
+
+export function createPaystackRecipient(input: { name: string; account_number: string; bank_code: string }) {
+  return paystackJson<PaystackRecipient>("/transferrecipient", {
+    method: "POST",
+    body: JSON.stringify({ type: "nuban", currency: "NGN", ...input })
+  });
+}
+
+export function fetchPaystackRecipient(idOrCode: string) {
+  return paystackJson<PaystackRecipient>(`/transferrecipient/${encodeURIComponent(idOrCode)}`);
+}
+
+export function verifyPaystackTransfer(reference: string) {
+  return paystackJson<PaystackTransfer>(`/transfer/verify/${encodeURIComponent(reference)}`);
+}
