@@ -36,6 +36,10 @@ export async function POST(request: Request, { params }: Params) {
     }
   }
 
+  if (!wasAlreadyPaid && (process.env.NODE_ENV === "production" || process.env.ALLOW_LOCAL_MOCK_PAYMENTS !== "true")) {
+    return fail("Paystack is not configured for job payments", 503);
+  }
+
   if (!wasAlreadyPaid) {
     const { error: paymentError } = await auth.adminClient
       .from("job_conversations")
