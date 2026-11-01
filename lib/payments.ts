@@ -545,6 +545,12 @@ export async function applyPaystackPaymentData(adminClient: AdminClient, referen
   const status = paymentStatusFromPaystack(String(transaction.status ?? ""));
   const now = new Date().toISOString();
 
+  if (payment.status === "success" && status !== "success") {
+    return payment.payment_type === "appointment_full"
+      ? { payment, appointment: null }
+      : { payment, conversation: null };
+  }
+
   if (status === "success" && (receivedAmount !== expectedAmount || receivedCurrency !== expectedCurrency)) {
     await adminClient
       .from("payments")

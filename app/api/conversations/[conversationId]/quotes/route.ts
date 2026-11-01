@@ -114,6 +114,9 @@ export async function POST(request: Request, { params }: Params) {
       project_description: body.data.project_description,
       total_budget: fixedAmount ?? body.data.total_budget,
       duration_days: body.data.duration_days,
+      requires_material_payment: body.data.requires_material_payment,
+      material_payment_amount: body.data.material_payment_amount,
+      material_payment_covers: body.data.material_payment_covers,
       attachments: body.data.attachments,
       created_by: auth.userId
     })

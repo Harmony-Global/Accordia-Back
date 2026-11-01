@@ -160,12 +160,27 @@ export const jobQuoteSchema = z.object({
   project_description: z.string().min(10).max(5000),
   total_budget: z.number().min(0),
   duration_days: z.number().int().min(1).max(365),
+  requires_material_payment: z.boolean().default(false),
+  material_payment_amount: z.number().positive().nullable().default(null),
+  material_payment_covers: z.string().trim().min(1).max(2000).nullable().default(null),
   attachments: z.array(z.object({
     name: z.string().min(1).max(255),
     type: z.string().max(120).nullable().optional(),
     size: z.number().int().min(0).max(10_485_760).nullable().optional()
   })).max(5).default([])
-}).strict();
+}).strict().superRefine((value, context) => {
+  if (value.requires_material_payment) {
+    if (value.material_payment_amount === null || value.material_payment_amount > value.total_budget ||
+        Math.abs(value.material_payment_amount * 100 - Math.round(value.material_payment_amount * 100)) > 1e-6) {
+      context.addIssue({ code: "custom", path: ["material_payment_amount"], message: "Material payment must be within the project budget" });
+    }
+    if (!value.material_payment_covers) {
+      context.addIssue({ code: "custom", path: ["material_payment_covers"], message: "Describe what the payment covers" });
+    }
+  } else if (value.material_payment_amount !== null || value.material_payment_covers !== null) {
+    context.addIssue({ code: "custom", path: ["requires_material_payment"], message: "Material payment details require Yes" });
+  }
+});
 
 export const quoteReviewSchema = z.object({
   note: z.string().min(3).max(2000)
