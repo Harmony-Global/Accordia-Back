@@ -167,6 +167,25 @@ export type PaystackTransfer = {
   recipient?: PaystackRecipient | number | string;
 };
 
+export type PaystackRefund = {
+  id: number;
+  transaction: number | { id: number };
+  amount: number;
+  currency: string;
+  status: string;
+  created_at?: string | null;
+  createdAt?: string | null;
+  updated_at?: string | null;
+  updatedAt?: string | null;
+  refunded_at?: string | null;
+};
+
+export function listPaystackRefunds(page: number, transactionId?: string) {
+  const params = new URLSearchParams({ page: String(page), perPage: "50" });
+  if (transactionId) params.set("transaction", transactionId);
+  return paystackJson<PaystackRefund[]>(`/refund?${params.toString()}`);
+}
+
 export async function listPaystackBanks() {
   const banks: PaystackBank[] = [];
   for (let page = 1; page <= 10; page += 1) {

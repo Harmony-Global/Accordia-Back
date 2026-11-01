@@ -3,10 +3,11 @@ import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { applyPaystackPaymentData, paymentFailure } from "@/lib/payments";
 import { isPaystackConfigured, verifyPaystackWebhookSignature, type PaystackTransactionData } from "@/lib/paystack";
 import { notifyPayoutConfirmed } from "@/lib/payout-notifications";
+import { syncPaystackRefundPage } from "@/lib/refunds";
 
 type PaystackWebhookEvent = {
   event?: string;
-  data?: PaystackTransactionData & { currency?: string; transfer_code?: string; transferred_at?: string | null; updatedAt?: string | null };
+  data?: PaystackTransactionData & { currency?: string; transfer_code?: string; transferred_at?: string | null; updatedAt?: string | null; transaction_reference?: string };
 };
 
 export async function POST(request: Request) {
@@ -54,6 +55,26 @@ export async function POST(request: Request) {
       if (status === "success") await notifyPayoutConfirmed(adminClient, payout.id);
     }
     return ok({ received: true });
+  }
+
+  if (event.event?.startsWith("refund.")) {
+    const reference = event.data?.transaction_reference;
+    if (!reference) return fail("Refund transaction reference is required", 422);
+    const adminClient = createSupabaseAdmin();
+    const { data: payment, error } = await adminClient.from("payments")
+      .select("provider_transaction_id").eq("provider", "paystack")
+      .eq("provider_reference", reference).maybeSingle();
+    if (error) return fail("Could not inspect refunded payment", 400, error.message);
+    if (!payment?.provider_transaction_id) return ok({ received: true, reconciliation_pending: true });
+    try {
+      for (let page = 1; page <= 20; page += 1) {
+        const result = await syncPaystackRefundPage(adminClient, page, payment.provider_transaction_id);
+        if (!result.has_more) break;
+      }
+      return ok({ received: true });
+    } catch (syncError) {
+      return fail("Could not reconcile Paystack refund", 503, syncError instanceof Error ? syncError.message : undefined);
+    }
   }
 
   if (event.event !== "charge.success") {
